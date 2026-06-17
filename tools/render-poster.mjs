@@ -37,6 +37,10 @@ const THEMES = {
 const t = THEMES[theme] || THEMES.summer;
 const h = t.head;
 
+const BG = process.env.BG;
+const bgB64 = BG ? readFileSync(BG).toString("base64") : null;
+const bgMime = BG && BG.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
+
 const SPK = (cls) =>
   `<svg class="${cls}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 0c.9 7 4 10.1 12 12-8 1.9-11.1 5-12 12-.9-7-4-10.1-12-12 8-1.9 11.1-5 12-12Z"/></svg>`;
 
@@ -96,9 +100,18 @@ ${fontCss()}
 .foot{position:absolute;left:0;right:0;bottom:74px;text-align:center;font-size:27px;font-weight:600;color:${t.accent}}
 .vat{position:absolute;right:70px;bottom:64px;border:1.5px solid ${t.accent}66;color:${t.accent};
   font-size:20px;font-weight:700;padding:6px 16px;border-radius:10px}
+.photo{position:absolute;inset:0;background-position:center;background-size:cover;background-repeat:no-repeat}
+.scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(22,24,34,.46),rgba(22,24,34,.10) 34%,transparent 50%,transparent 66%,rgba(22,24,34,.14))}
+.has-photo .wm,.has-photo .sub,.has-photo .branch,.has-photo .branch b,.has-photo .title,.has-photo .title .l2,.has-photo .sup,.has-photo .script{color:#fff !important;text-shadow:0 2px 16px rgba(0,0,0,.45)}
+.has-photo .logo .mark{border-color:#fff;color:#fff}
+.has-photo .spk{fill:#fff;opacity:.85}
+.has-photo .foot{color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.5)}
+.has-photo .vat{border-color:#ffffffaa;color:#fff}
 </style></head><body>
-<div class="poster">
-  <div class="blob"></div><div class="dots"></div>
+<div class="poster ${bgB64 ? "has-photo" : ""}">
+  ${bgB64
+    ? `<div class="photo" style="background-image:url(data:${bgMime};base64,${bgB64})"></div><div class="scrim"></div>`
+    : `<div class="blob"></div><div class="dots"></div>`}
   ${SPK("spk s1")}${SPK("spk s2")}${SPK("spk s3")}
   <div class="top">
     <div class="logo"><div class="mark">B</div><div><div class="wm">BEAUTY PARK</div><div class="sub">뷰티파크의원 범어점</div></div></div>

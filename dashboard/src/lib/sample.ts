@@ -1,4 +1,4 @@
-import raw from "../data/2026-07.json";
+import raw from "../data/2026-06.json";
 import type { RequestData } from "./types";
 
 // tools/parse_request.py 가 만든 JSON(한글 키)을 RequestData 형태로 변환한 기본 샘플.

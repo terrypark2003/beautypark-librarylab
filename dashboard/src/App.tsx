@@ -1,9 +1,11 @@
 import { useState } from "react";
+import PosterStudio from "./components/PosterStudio";
 import EventHub from "./components/EventHub";
 import { BrandPanel, ChannelsPanel, CalendarPanel, ChecklistPanel } from "./components/Panels";
 
 const TABS = [
-  { id: "events", label: "이벤트 콘텐츠 허브", hint: "엑셀 → 카피 덱" },
+  { id: "posters", label: "이벤트 포스터", hint: "엑셀 → 이미지" },
+  { id: "copy", label: "카피 덱(텍스트)", hint: "엑셀 → 카피" },
   { id: "brand", label: "브랜드 가이드", hint: "로고 · 컬러" },
   { id: "channels", label: "채널 · 계정", hint: "바로가기" },
   { id: "calendar", label: "운영 캘린더", hint: "발행 주기" },
@@ -13,7 +15,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 export default function App() {
-  const [tab, setTab] = useState<TabId>("events");
+  const [tab, setTab] = useState<TabId>("posters");
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
@@ -46,7 +48,8 @@ export default function App() {
       {/* 본문 */}
       <main className="flex-1 overflow-x-hidden">
         <div className="mx-auto max-w-5xl p-5 md:p-8">
-          {tab === "events" && <EventHub />}
+          {tab === "posters" && <PosterStudio />}
+          {tab === "copy" && <EventHub />}
           {tab === "brand" && <BrandPanel />}
           {tab === "channels" && <ChannelsPanel />}
           {tab === "calendar" && <CalendarPanel />}
