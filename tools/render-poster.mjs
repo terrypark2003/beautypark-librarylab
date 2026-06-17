@@ -92,7 +92,7 @@ ${fontCss()}
 .row{flex:1;display:flex;align-items:center;justify-content:space-between;padding:0 50px;
   border-bottom:1px solid ${t.divider}}
 .row:last-child{border-bottom:0}
-.name{font-size:32px;font-weight:600;line-height:1.32;max-width:60%;letter-spacing:-.4px}
+.name{font-size:32px;font-weight:600;line-height:1.32;max-width:62%;letter-spacing:-.4px;word-break:keep-all;overflow-wrap:anywhere}
 .price{display:flex;align-items:baseline;gap:22px;white-space:nowrap}
 .was{font-size:25px;color:${t.was};text-decoration:line-through;font-weight:500}
 .now{font-family:'Playfair Display',serif;font-weight:900;font-size:72px;color:${t.accentDeep};line-height:1}

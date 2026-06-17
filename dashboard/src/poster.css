@@ -80,7 +80,7 @@
 }
 .poster .row { flex: 1; display: flex; align-items: center; justify-content: space-between; padding: 0 50px; border-bottom: 1px solid var(--divider); }
 .poster .row:last-child { border-bottom: 0; }
-.poster .name { font-size: 32px; font-weight: 600; line-height: 1.32; max-width: 60%; letter-spacing: -0.4px; }
+.poster .name { font-size: 32px; font-weight: 600; line-height: 1.32; max-width: 62%; letter-spacing: -0.4px; word-break: keep-all; overflow-wrap: anywhere; }
 .poster .price { display: flex; align-items: baseline; gap: 22px; white-space: nowrap; }
 .poster .was { font-size: 25px; color: var(--was); text-decoration: line-through; font-weight: 500; }
 .poster .now { font-family: "Playfair Display", serif; font-weight: 900; font-size: 72px; color: var(--accent-deep); line-height: 1; }
