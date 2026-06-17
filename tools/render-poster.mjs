@@ -123,9 +123,9 @@ ${fontCss()}
     ${t.badge ? `<div class="badge">${t.badge}</div>` : ""}
     <div class="title">${h.l1}${h.l2 ? `<span class="l2">${h.l2}</span>` : ""}</div>
   </div>
-  <div class="panel">${rows}</div>
+  ${process.env.SKIP_PANEL === "1" ? "" : `<div class="panel">${rows}</div>
   <div class="foot">부가세 10% 별도 &nbsp;·&nbsp; 현금 / 카드 동일</div>
-  <div class="vat">VAT 별도</div>
+  <div class="vat">VAT 별도</div>`}
 </div></body></html>`;
 
 const browser = await chromium.launch({

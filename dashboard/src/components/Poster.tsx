@@ -13,15 +13,17 @@ interface Props {
   group: EventGroup;
   themeKey: string;
   sheet: string;
-  bgUrl?: string | null;
+  bgUrl?: string | null; // 배경 플레이트(아트). 있으면 플레이트 모드.
+  panelTop?: number; // 플레이트 모드에서 데이터 패널 상단 위치(px)
 }
 
-/** 1080x1527 포스터. ref로 html-to-image 캡처. */
-export const Poster = forwardRef<HTMLDivElement, Props>(({ group, themeKey, sheet, bgUrl }, ref) => {
+/** 1080x1527 포스터. ref로 html-to-image 캡처. bgUrl이 있으면 '플레이트 모드'(아트 위에 데이터 패널만 합성). */
+export const Poster = forwardRef<HTMLDivElement, Props>(({ group, themeKey, sheet, bgUrl, panelTop = 560 }, ref) => {
   const theme = THEMES[themeKey] || THEMES.summer;
   const t = theme.tokens;
   const h = theme.headline(group);
   const items = validItems(group);
+  const plate = !!bgUrl;
 
   const styleVars = {
     ["--bg" as any]: t.bg,
@@ -36,47 +38,47 @@ export const Poster = forwardRef<HTMLDivElement, Props>(({ group, themeKey, shee
   };
 
   return (
-    <div ref={ref} className={`poster${bgUrl ? " has-photo" : ""}`} style={styleVars}>
-      {bgUrl ? (
-        <>
-          <div className="photo" style={{ backgroundImage: `url(${bgUrl})` }} />
-          <div className="scrim" />
-        </>
+    <div ref={ref} className={`poster${plate ? " plate has-photo" : ""}`} style={styleVars}>
+      {plate ? (
+        <div className="photo" style={{ backgroundImage: `url(${bgUrl})` }} />
       ) : (
         <>
           <div className="blob" />
           <div className="dots" />
         </>
       )}
-      <Spark cls="s1" />
-      <Spark cls="s2" />
-      <Spark cls="s3" />
 
-      <div className="top">
-        <div className="logo">
-          <div className="mark">B</div>
-          <div>
-            <div className="wm">BEAUTY PARK</div>
-            <div className="sub">뷰티파크의원 범어점</div>
+      {!plate && (
+        <>
+          <Spark cls="s1" />
+          <Spark cls="s2" />
+          <Spark cls="s3" />
+          <div className="top">
+            <div className="logo">
+              <div className="mark">B</div>
+              <div>
+                <div className="wm">BEAUTY PARK</div>
+                <div className="sub">뷰티파크의원 범어점</div>
+              </div>
+            </div>
+            <div className="branch">
+              EVENT · {sheet}
+              <b>BEOMEO</b>
+            </div>
           </div>
-        </div>
-        <div className="branch">
-          EVENT · {sheet}
-          <b>BEOMEO</b>
-        </div>
-      </div>
+          <div className="head">
+            {h.script && <div className="script en">{h.script}</div>}
+            {h.sup && <div className="sup">{h.sup}</div>}
+            {h.badge && <div className="badge">{h.badge}</div>}
+            <div className="title">
+              {h.l1}
+              {h.l2 && <span className="l2">{h.l2}</span>}
+            </div>
+          </div>
+        </>
+      )}
 
-      <div className="head">
-        {h.script && <div className="script en">{h.script}</div>}
-        {h.sup && <div className="sup">{h.sup}</div>}
-        {h.badge && <div className="badge">{h.badge}</div>}
-        <div className="title">
-          {h.l1}
-          {h.l2 && <span className="l2">{h.l2}</span>}
-        </div>
-      </div>
-
-      <div className="panel">
+      <div className="panel" style={plate ? { top: panelTop } : undefined}>
         {items.map((it, i) => (
           <div className="row" key={i}>
             <div className="name">{it.name}</div>

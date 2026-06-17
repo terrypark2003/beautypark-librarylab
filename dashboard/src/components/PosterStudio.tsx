@@ -8,6 +8,7 @@ import { THEME_LIST, themeKeyForGroup } from "../lib/themes";
 import { Poster } from "./Poster";
 
 const sanitize = (s: string) => s.replace(/[\\/:*?"<>|\n]/g, "").replace(/\s+/g, "").slice(0, 40);
+type Plate = { url: string; top: number };
 
 export default function PosterStudio() {
   const [data, setData] = useState<RequestData>(() => sampleData());
@@ -16,6 +17,7 @@ export default function PosterStudio() {
   const [monthSheets, setMonthSheets] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [themes, setThemes] = useState<Record<number, string>>({});
+  const [plates, setPlates] = useState<Record<number, Plate>>({});
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -23,8 +25,10 @@ export default function PosterStudio() {
 
   const themeFor = (gi: number) => themes[gi] ?? themeKeyForGroup(data.groups[gi]?.group ?? "");
 
-  // 업로드/시트 변경 시 테마 초기화
-  useMemo(() => setThemes({}), [data]);
+  useMemo(() => {
+    setThemes({});
+    setPlates({});
+  }, [data]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -48,14 +52,30 @@ export default function PosterStudio() {
     setSource(`${source.split(" · ")[0]} · ${e.target.value}`);
   }
 
-  // 캡처 → PNG 다운로드
+  function onPlate(gi: number, file?: File) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setPlates((p) => ({ ...p, [gi]: { url: String(reader.result), top: p[gi]?.top ?? 560 } }));
+    reader.readAsDataURL(file);
+  }
+  function setTop(gi: number, top: number) {
+    setPlates((p) => (p[gi] ? { ...p, [gi]: { ...p[gi], top } } : p));
+  }
+  function removePlate(gi: number) {
+    setPlates((p) => {
+      const n = { ...p };
+      delete n[gi];
+      return n;
+    });
+  }
+
   useEffect(() => {
     if (!cap) return;
     let cancelled = false;
     (async () => {
       try {
         await (document as any).fonts?.ready;
-        await new Promise((r) => setTimeout(r, 120));
+        await new Promise((r) => setTimeout(r, 140));
         const node = captureRef.current;
         if (node && !cancelled) {
           const url = await toPng(node, { pixelRatio: 2, width: 1080, height: 1527, cacheBust: true });
@@ -76,22 +96,20 @@ export default function PosterStudio() {
   }, [cap]);
 
   function downloadOne(gi: number) {
-    const g = data.groups[gi];
-    setCap({ gi, name: `뷰티파크_${data.sheet}_${sanitize(g.group)}.png` });
+    setCap({ gi, name: `뷰티파크_${data.sheet}_${sanitize(data.groups[gi].group)}.png` });
   }
-
   async function downloadAll() {
     setBusy(true);
     for (let gi = 0; gi < data.groups.length; gi++) {
-      const g = data.groups[gi];
       await new Promise<void>((resolve) => {
-        setCap({ gi, name: `뷰티파크_${data.sheet}_${sanitize(g.group)}.png` });
-        const check = setInterval(() => {
-          if (captureRef.current === null) return;
-          resolve();
-          clearInterval(check);
+        setCap({ gi, name: `뷰티파크_${data.sheet}_${sanitize(data.groups[gi].group)}.png` });
+        const iv = setInterval(() => {
+          if (captureRef.current === null) {
+            clearInterval(iv);
+            resolve();
+          }
         }, 50);
-        setTimeout(() => resolve(), 1500); // 안전 타임아웃
+        setTimeout(() => { clearInterval(iv); resolve(); }, 2500);
       });
       await new Promise((r) => setTimeout(r, 250));
     }
@@ -100,7 +118,6 @@ export default function PosterStudio() {
 
   return (
     <div className="space-y-7">
-      {/* 업로드 바 */}
       <div className="rounded-xl border border-taupe/20 bg-ivory p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -110,9 +127,7 @@ export default function PosterStudio() {
           <div className="flex items-center gap-2">
             {monthSheets.length > 1 && (
               <select onChange={onSheet} defaultValue={data.sheet} className="rounded-md border border-taupe/40 bg-white px-2 py-1.5 text-sm">
-                {monthSheets.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
+                {monthSheets.map((s) => (<option key={s} value={s}>{s}</option>))}
               </select>
             )}
             <input ref={fileRef} type="file" accept=".xlsx" onChange={onFile} className="hidden" />
@@ -124,37 +139,53 @@ export default function PosterStudio() {
             </button>
           </div>
         </div>
+        <p className="mt-2 text-xs text-charcoal/55">
+          💡 각 포스터에 <b>배경 플레이트(아트)</b>를 올리면 — 가격 패널만 그 위에 자동 합성됩니다(업체 스타일 재현). 플레이트 없으면 기본 테마로 자동 생성.
+        </p>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
-      {/* 포스터 그리드 */}
       <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-3">
-        {data.groups.map((g, gi) => (
-          <div key={gi} className="flex flex-col items-center gap-3">
-            <div className="poster-scale">
-              <Poster group={g} themeKey={themeFor(gi)} sheet={data.sheet} />
+        {data.groups.map((g, gi) => {
+          const plate = plates[gi];
+          return (
+            <div key={gi} className="flex flex-col items-center gap-2.5">
+              <div className="poster-scale">
+                <Poster group={g} themeKey={themeFor(gi)} sheet={data.sheet} bgUrl={plate?.url} panelTop={plate?.top} />
+              </div>
+
+              <div className="flex w-[360px] items-center gap-2">
+                {!plate ? (
+                  <select value={themeFor(gi)} onChange={(e) => setThemes((m) => ({ ...m, [gi]: e.target.value }))} className="flex-1 rounded-md border border-taupe/40 bg-white px-2 py-1.5 text-xs">
+                    {THEME_LIST.map((t) => (<option key={t.key} value={t.key}>{t.label}</option>))}
+                  </select>
+                ) : (
+                  <label className="flex flex-1 items-center gap-2 text-xs text-charcoal/70">
+                    패널위치
+                    <input type="range" min={300} max={1000} step={5} value={plate.top} onChange={(e) => setTop(gi, Number(e.target.value))} className="flex-1 accent-taupe" />
+                  </label>
+                )}
+                <button onClick={() => downloadOne(gi)} className="rounded-md bg-taupe px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-taupe-deep">PNG</button>
+              </div>
+
+              <div className="flex w-[360px] items-center gap-2">
+                <label className="flex-1 cursor-pointer rounded-md border border-dashed border-taupe/50 bg-white px-2 py-1.5 text-center text-xs text-taupe-deep hover:bg-taupe/5">
+                  {plate ? "배경 플레이트 변경" : "배경 플레이트 업로드 (아트)"}
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => onPlate(gi, e.target.files?.[0])} />
+                </label>
+                {plate && (
+                  <button onClick={() => removePlate(gi)} className="rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-charcoal/60 hover:bg-taupe/10">제거</button>
+                )}
+              </div>
             </div>
-            <div className="flex w-[360px] items-center gap-2">
-              <select
-                value={themeFor(gi)}
-                onChange={(e) => setThemes((m) => ({ ...m, [gi]: e.target.value }))}
-                className="flex-1 rounded-md border border-taupe/40 bg-white px-2 py-1.5 text-xs"
-              >
-                {THEME_LIST.map((t) => (
-                  <option key={t.key} value={t.key}>{t.label}</option>
-                ))}
-              </select>
-              <button onClick={() => downloadOne(gi)} className="rounded-md bg-taupe px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-taupe-deep">
-                PNG 다운로드
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* 캡처용 숨김 풀사이즈 포스터 */}
       <div style={{ position: "fixed", left: -20000, top: 0, pointerEvents: "none" }} aria-hidden>
-        {cap && <Poster ref={captureRef} group={data.groups[cap.gi]} themeKey={themeFor(cap.gi)} sheet={data.sheet} />}
+        {cap && (
+          <Poster ref={captureRef} group={data.groups[cap.gi]} themeKey={themeFor(cap.gi)} sheet={data.sheet} bgUrl={plates[cap.gi]?.url} panelTop={plates[cap.gi]?.top} />
+        )}
       </div>
     </div>
   );
