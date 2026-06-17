@@ -5,6 +5,7 @@ import type { RequestData } from "../lib/types";
 import { sampleData } from "../lib/sample";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
 import { THEME_LIST, themeKeyForGroup } from "../lib/themes";
+import { themeBg } from "../lib/backgrounds";
 import { Poster } from "./Poster";
 
 const sanitize = (s: string) => s.replace(/[\\/:*?"<>|\n]/g, "").replace(/\s+/g, "").slice(0, 40);
@@ -151,7 +152,7 @@ export default function PosterStudio() {
           return (
             <div key={gi} className="flex flex-col items-center gap-2.5">
               <div className="poster-scale">
-                <Poster group={g} themeKey={themeFor(gi)} sheet={data.sheet} bgUrl={plate?.url} panelTop={plate?.top} />
+                <Poster group={g} themeKey={themeFor(gi)} sheet={data.sheet} bgUrl={plate?.url} photoBg={!plate ? themeBg(themeFor(gi)) : undefined} panelTop={plate?.top} />
               </div>
 
               <div className="flex w-[360px] items-center gap-2">
@@ -184,7 +185,7 @@ export default function PosterStudio() {
 
       <div style={{ position: "fixed", left: -20000, top: 0, pointerEvents: "none" }} aria-hidden>
         {cap && (
-          <Poster ref={captureRef} group={data.groups[cap.gi]} themeKey={themeFor(cap.gi)} sheet={data.sheet} bgUrl={plates[cap.gi]?.url} panelTop={plates[cap.gi]?.top} />
+          <Poster ref={captureRef} group={data.groups[cap.gi]} themeKey={themeFor(cap.gi)} sheet={data.sheet} bgUrl={plates[cap.gi]?.url} photoBg={!plates[cap.gi] ? themeBg(themeFor(cap.gi)) : undefined} panelTop={plates[cap.gi]?.top} />
         )}
       </div>
     </div>

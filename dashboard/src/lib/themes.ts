@@ -81,6 +81,17 @@ export const THEMES: Record<string, ThemeDef> = {
     },
     headline: () => ({ script: "Ready to Go", l1: "READY", l2: "TO GO" }),
   },
+  luxe: {
+    key: "luxe",
+    label: "그랜드/프리미엄 (레드·골드)",
+    tokens: {
+      bg: "linear-gradient(160deg,#3a1115 0%,#5e1a20 55%,#7a232b 100%)",
+      blob: "radial-gradient(55% 40% at 80% 8%, rgba(214,178,110,.35), transparent 65%)",
+      ink: "#f5e9d6", accent: "#D9B36A", accentDeep: "#E7C988",
+      script: "#D9B36A", panel: "rgba(255,255,255,.97)", divider: "#ECE6DA", was: "#b9b1a2",
+    },
+    headline: (g) => ({ script: "Premium Event", ...splitName(g) }),
+  },
   board: {
     key: "board",
     label: "상반기 결산 (보드)",
@@ -100,6 +111,7 @@ export function themeKeyForGroup(name: string): string {
   if (n.includes("화수목")) return "green";
   if (/readytogo/i.test(n) || n.includes("READYTOGO")) return "sky";
   if (n.includes("결산")) return "board";
+  if (n.includes("리오프닝") || n.includes("그랜드") || n.includes("프리미엄") || /launching/i.test(n)) return "luxe";
   return "summer";
 }
 
