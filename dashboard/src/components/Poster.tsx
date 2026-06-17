@@ -13,23 +13,27 @@ interface Props {
   group: EventGroup;
   themeKey: string;
   sheet: string;
-  bgUrl?: string | null; // 업로드 플레이트(타이틀 포함 아트) → 타이틀/로고 숨김, 패널만 합성
-  photoBg?: string | null; // 테마 배경 사진 → 타이틀/로고 표시(흰색), 패널 합성
-  panelTop?: number; // 플레이트 모드 패널 상단 위치(px)
+  bgUrl?: string | null; // 업로드 배경
+  photoBg?: string | null; // 테마 배경
+  hideTitle?: boolean; // 배경에 타이틀이 이미 포함된 경우 앱 타이틀/로고 숨김
+  width?: number;
+  height?: number;
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, panelTop = 560 }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527 }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const t = theme.tokens;
     const h = theme.headline(group);
     const items = validItems(group);
 
     const photo = bgUrl || photoBg || null;
-    const plate = !!bgUrl; // 업로드 플레이트: 타이틀 숨김
-    const showHead = !plate; // 사진 배경(테마)이거나 배경 없으면 타이틀 표시
+    const showTitle = !hideTitle;
+    const land = width > height;
 
     const styleVars = {
+      ["--w" as any]: width,
+      ["--h" as any]: height,
       ["--bg" as any]: t.bg,
       ["--blob" as any]: t.blob,
       ["--ink" as any]: t.ink,
@@ -42,7 +46,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     };
 
     return (
-      <div ref={ref} className={`poster${photo ? " has-photo" : ""}${plate ? " plate" : ""}`} style={styleVars}>
+      <div ref={ref} className={`poster${photo ? " has-photo" : ""}${land ? " land" : ""}`} style={styleVars}>
         {photo ? (
           <div className="photo" style={{ backgroundImage: `url(${photo})` }} />
         ) : (
@@ -51,9 +55,9 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
             <div className="dots" />
           </>
         )}
-        {photo && !plate && <div className="scrim" />}
+        {photo && showTitle && <div className="scrim" />}
 
-        {showHead && (
+        {showTitle && (
           <>
             <Spark cls="s1" />
             <Spark cls="s2" />
@@ -71,6 +75,11 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
                 <b>BEOMEO</b>
               </div>
             </div>
+          </>
+        )}
+
+        <div className="body">
+          {showTitle && (
             <div className="head">
               {h.script && <div className="script en">{h.script}</div>}
               {h.sup && <div className="sup">{h.sup}</div>}
@@ -80,22 +89,21 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
                 {h.l2 && <span className="l2">{h.l2}</span>}
               </div>
             </div>
-          </>
-        )}
-
-        <div className="panel" style={plate ? { top: panelTop } : undefined}>
-          {items.map((it, i) => (
-            <div className="row" key={i}>
-              <div className="name">{it.name}</div>
-              <div className="price">
-                {normalPrice(it) != null && <span className="was">{manwon(normalPrice(it))}만원</span>}
-                <span className="now">
-                  {manwon(eventPrice(it))}
-                  <span className="unit">만원</span>
-                </span>
+          )}
+          <div className="panel">
+            {items.map((it, i) => (
+              <div className="row" key={i}>
+                <div className="name">{it.name}</div>
+                <div className="price">
+                  {normalPrice(it) != null && <span className="was">{manwon(normalPrice(it))}만원</span>}
+                  <span className="now">
+                    {manwon(eventPrice(it))}
+                    <span className="unit">만원</span>
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <div className="foot">부가세 10% 별도 &nbsp;·&nbsp; 현금 / 카드 동일</div>
