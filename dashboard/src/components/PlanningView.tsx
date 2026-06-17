@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { RequestData } from "../lib/types";
 import { references, latest, nextMonth, key, label, history, type HMonth } from "../lib/history";
+import { loadWorkbook, parseSheet } from "../lib/parseRequest";
 
 interface PItem { name: string; normalMan: string; eventMan: string }
 interface PGroup { group: string; items: PItem[] }
@@ -25,8 +26,38 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
   const [m, setM] = useState(init.m);
   const [plan, setPlan] = useState<PGroup[]>([]);
   const [emphasis, setEmphasis] = useState("");
+  const [overrides, setOverrides] = useState<Record<string, HMonth>>({});
+  const [ovError, setOvError] = useState<string | null>(null);
+  const ovRef = useRef<HTMLInputElement>(null);
 
-  const refs = useMemo(() => references(y, m), [y, m]);
+  const effHistory = useMemo(() => ({ ...history, ...overrides }), [overrides]);
+  const refs = useMemo(() => references(y, m, effHistory), [y, m, effHistory]);
+
+  async function onOverride(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setOvError(null);
+    try {
+      const { wb, monthSheets } = await loadWorkbook(await file.arrayBuffer());
+      if (!monthSheets.length) throw new Error("월별 시트(YYYY.M)를 찾지 못했습니다");
+      const ov: Record<string, HMonth> = {};
+      for (const s of monthSheets) {
+        const d = parseSheet(wb, s);
+        const [yy, mm] = s.split(".").map(Number);
+        ov[`${yy}.${mm}`] = {
+          title: d.title,
+          emphasis: d.emphasis || "",
+          groups: d.groups.map((g) => ({
+            group: g.group.replace(/\n/g, " ").trim(),
+            items: g.items.filter((it) => it.name && it.name !== "`").map((it) => ({ name: it.name, event: it.event, normal: it.normal })),
+          })),
+        };
+      }
+      setOverrides((o) => ({ ...o, ...ov }));
+    } catch (err) {
+      setOvError(`엑셀을 읽지 못했습니다: ${(err as Error).message}`);
+    }
+  }
 
   const update = (fn: (p: PGroup[]) => PGroup[]) => setPlan((p) => fn(structuredClone(p)));
   const addGroup = () => update((p) => [...p, { group: "새 이벤트", items: [{ name: "", normalMan: "", eventMan: "" }] }]);
@@ -61,7 +92,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
           <h2 className="font-serif text-2xl text-charcoal">이벤트 기획</h2>
           <span className="text-sm text-charcoal/55">작년·재작년 같은 달을 참고해 이달 라인업 구성</span>
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-charcoal/60">기획 대상</span>
           <select value={y} onChange={(e) => setY(Number(e.target.value))} className="rounded-md border border-taupe/40 bg-white px-2 py-1.5">
             {[2025, 2026, 2027].map((yy) => <option key={yy} value={yy}>{yy}년</option>)}
@@ -69,8 +100,23 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
           <select value={m} onChange={(e) => setM(Number(e.target.value))} className="rounded-md border border-taupe/40 bg-white px-2 py-1.5">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((mm) => <option key={mm} value={mm}>{mm}월</option>)}
           </select>
+          <input ref={ovRef} type="file" accept=".xlsx" className="hidden" onChange={onOverride} />
+          <button onClick={() => ovRef.current?.click()} className="rounded-md border border-taupe/40 bg-white px-3 py-1.5 font-medium text-taupe-deep hover:bg-taupe/10">
+            엑셀로 히스토리 덮어쓰기
+          </button>
         </div>
       </div>
+
+      {(Object.keys(overrides).length > 0 || ovError) && (
+        <div className="-mt-2 text-xs">
+          {Object.keys(overrides).length > 0 && (
+            <span className="rounded bg-emerald-50 px-2 py-1 text-emerald-700">
+              ✔ 내 엑셀로 덮어씀: {Object.keys(overrides).sort().map(label).join(", ")} (학습본보다 우선)
+            </span>
+          )}
+          {ovError && <span className="ml-2 text-red-600">{ovError}</span>}
+        </div>
+      )}
 
       {/* 참고: 작년/재작년/직전월 */}
       <div>

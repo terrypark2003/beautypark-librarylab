@@ -38,12 +38,16 @@ export function prevMonthKey(y: number, m: number): string {
   return m === 1 ? key(y - 1, 12) : key(y, m - 1);
 }
 
-/** 기획 참고용: 동월 작년·재작년 + 직전월 */
-export function references(y: number, m: number): { tag: string; key: string; data?: HMonth }[] {
+/** 기획 참고용: 동월 작년·재작년 + 직전월. hist에 오버라이드 맵을 넘기면 그걸 우선 사용 */
+export function references(
+  y: number,
+  m: number,
+  hist: Record<string, HMonth> = history
+): { tag: string; key: string; data?: HMonth }[] {
   const refs = [
     { tag: "작년 동월", key: key(y - 1, m) },
     { tag: "재작년 동월", key: key(y - 2, m) },
     { tag: "직전월", key: prevMonthKey(y, m) },
   ];
-  return refs.map((r) => ({ ...r, data: history[r.key] }));
+  return refs.map((r) => ({ ...r, data: hist[r.key] }));
 }
