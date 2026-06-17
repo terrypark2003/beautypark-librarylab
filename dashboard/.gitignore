@@ -1,0 +1,8 @@
+node_modules
+dist
+*.tsbuildinfo
+.vercel
+
+# tsc -b emitted artifacts
+vite.config.js
+vite.config.d.ts
