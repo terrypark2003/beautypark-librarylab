@@ -11,9 +11,9 @@ import { Poster } from "./Poster";
 const sanitize = (s: string) => s.replace(/[\\/:*?"<>|\n]/g, "").replace(/\s+/g, "").slice(0, 40);
 type Plate = { url: string; top: number };
 
-export default function PosterStudio() {
-  const [data, setData] = useState<RequestData>(() => sampleData());
-  const [source, setSource] = useState("샘플 · 2026.6");
+export default function PosterStudio({ initialData }: { initialData?: RequestData | null }) {
+  const [data, setData] = useState<RequestData>(() => initialData ?? sampleData());
+  const [source, setSource] = useState(initialData ? `기획 · ${initialData.sheet}` : "샘플 · 2026.6");
   const [wb, setWb] = useState<Workbook | null>(null);
   const [monthSheets, setMonthSheets] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +30,13 @@ export default function PosterStudio() {
     setThemes({});
     setPlates({});
   }, [data]);
+
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+      setSource(`기획 · ${initialData.sheet}`);
+    }
+  }, [initialData]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
