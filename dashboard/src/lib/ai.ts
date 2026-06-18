@@ -40,7 +40,10 @@ export async function suggestTitles(input: { month: string; treatments: string[]
     });
     if (r.ok) {
       const d = await r.json();
-      if (Array.isArray(d.titles) && d.titles.length) return { titles: d.titles };
+      if (Array.isArray(d.titles) && d.titles.length) {
+        const label = d.via === "gemini" ? "Gemini 추천 ✨" : d.via === "anthropic" ? "Claude 추천 ✨" : undefined;
+        return { titles: d.titles, note: label };
+      }
       return { titles: fallback(input), note: d.note || "오프라인 추천" };
     }
   } catch {
