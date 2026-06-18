@@ -79,6 +79,10 @@ async function callAnthropic(key: string, prompt: string, preferred?: string): P
 }
 
 export default async function handler(req: any, res: any) {
+  if (req.method === "GET") {
+    res.status(200).json({ ok: true, providers: { gemini: !!process.env.GEMINI_API_KEY, anthropic: !!process.env.ANTHROPIC_API_KEY } });
+    return;
+  }
   if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
   const gemini = process.env.GEMINI_API_KEY;
   const anthropic = process.env.ANTHROPIC_API_KEY;

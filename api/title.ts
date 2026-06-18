@@ -71,6 +71,11 @@ async function callAnthropic(key: string, prompt: string, preferred?: string): P
 }
 
 export default async function handler(req: any, res: any) {
+  if (req.method === "GET") {
+    // 진단용: 키 '존재 여부'만 노출(값은 절대 반환하지 않음)
+    res.status(200).json({ ok: true, providers: { gemini: !!process.env.GEMINI_API_KEY, anthropic: !!process.env.ANTHROPIC_API_KEY } });
+    return;
+  }
   if (req.method !== "POST") {
     res.status(405).json({ error: "POST only" });
     return;
