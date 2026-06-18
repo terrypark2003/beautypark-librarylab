@@ -54,7 +54,9 @@
 .poster .body > .panel { width: 100%; }
 .poster:not(.land) .body > .panel { flex: 1; width: calc(var(--panel-width, 100) * 1%); align-self: var(--panel-align, center); }
 .poster.land .body > .panel { flex: 1.15; align-self: stretch; max-height: 100%; }
+.poster .panel .phead { margin-top: -.45em; background: var(--accent-deep); color: #fff; font-size: .58em; font-weight: 600; letter-spacing: .02em; padding: .9em 1.4em; border-radius: 1.05em 1.05em 0 0; text-align: center; }
 .poster .row { flex: 1; display: flex; align-items: center; justify-content: space-between; padding: 0 1.55em; border-bottom: 1px solid var(--divider); }
+.poster .row .disc { font-size: .6em; font-weight: 800; color: #fff; background: #d24b4b; border-radius: 1em; padding: .16em .55em; align-self: center; }
 .poster .row:last-child { border-bottom: 0; }
 .poster .name { font-size: 1em; font-weight: 600; line-height: 1.32; max-width: 62%; letter-spacing: -.012em; word-break: keep-all; overflow-wrap: anywhere; }
 .poster .price { display: flex; align-items: baseline; gap: .68em; white-space: nowrap; }

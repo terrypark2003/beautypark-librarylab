@@ -26,12 +26,16 @@ interface Props {
   panelAlign?: "left" | "center" | "right"; // 패널 가로 정렬
   scriptOverride?: string; // 영문 태그(스크립트) 직접 지정. undefined면 테마 기본값
   variant?: string; // 레이아웃 변형: classic|center|band|editorial|minimal
+  showHeader?: boolean; // 패널 상단 기간/대상 바
+  headerPeriod?: string;
+  headerTarget?: string;
+  showDiscount?: boolean; // 할인율 % 배지
 }
 
 const ALIGN: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic" }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const t = theme.tokens;
     const h = theme.headline(group);
@@ -111,18 +115,28 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
             </div>
           )}
           <div className="panel">
-            {items.map((it, i) => (
-              <div className="row" key={i}>
-                <div className="name">{it.name}</div>
-                <div className="price">
-                  {normalPrice(it) != null && <span className="was">{manwon(normalPrice(it))}만원</span>}
-                  <span className="now">
-                    {manwon(eventPrice(it))}
-                    <span className="unit">만원</span>
-                  </span>
-                </div>
+            {showHeader && (headerPeriod || headerTarget) && (
+              <div className="phead">
+                {[headerPeriod && `이벤트 기간 : ${headerPeriod}`, headerTarget && `이벤트 대상 : ${headerTarget}`].filter(Boolean).join("   |   ")}
               </div>
-            ))}
+            )}
+            {items.map((it, i) => {
+              const n = normalPrice(it), e = eventPrice(it);
+              const disc = n && e ? Math.round((1 - e / n) * 100) : 0;
+              return (
+                <div className="row" key={i}>
+                  <div className="name">{it.name}</div>
+                  <div className="price">
+                    {showDiscount && disc > 0 && <span className="disc">{disc}%</span>}
+                    {n != null && <span className="was">{manwon(n)}만원</span>}
+                    <span className="now">
+                      {manwon(e)}
+                      <span className="unit">만원</span>
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

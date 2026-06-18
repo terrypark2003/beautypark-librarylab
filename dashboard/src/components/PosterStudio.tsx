@@ -45,6 +45,10 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [panelWidth, setPanelWidth] = useState(100);
   const [panelAlign, setPanelAlign] = useState<"left" | "center" | "right">("center");
   const [scripts, setScripts] = useState<Record<number, string>>({});
+  const [showHeader, setShowHeader] = useState(false);
+  const [headerPeriod, setHeaderPeriod] = useState("");
+  const [headerTarget, setHeaderTarget] = useState("카카오톡 플러스 친구 대상");
+  const [showDiscount, setShowDiscount] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -169,6 +173,16 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
               <option value="left">좌</option><option value="center">중</option><option value="right">우</option>
             </select>
           </label>
+          <label className="flex items-center gap-1.5"><input type="checkbox" checked={showDiscount} onChange={(e) => setShowDiscount(e.target.checked)} className="accent-taupe" />할인율 배지</label>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-charcoal/70">
+          <label className="flex items-center gap-1.5"><input type="checkbox" checked={showHeader} onChange={(e) => setShowHeader(e.target.checked)} className="accent-taupe" />패널 헤더 바</label>
+          {showHeader && (
+            <>
+              <input value={headerPeriod} onChange={(e) => setHeaderPeriod(e.target.value)} placeholder="기간 (예: 2026.08.01~08.31)" className="w-52 rounded border border-taupe/30 px-2 py-1" />
+              <input value={headerTarget} onChange={(e) => setHeaderTarget(e.target.value)} placeholder="대상" className="w-56 rounded border border-taupe/30 px-2 py-1" />
+            </>
+          )}
         </div>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
@@ -183,7 +197,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   <Poster group={g} themeKey={themeFor(gi)} sheet={data.sheet} width={size.w} height={size.h}
                     bgUrl={plate?.url} photoBg={!plate ? themeBg(themeFor(gi)) : undefined} hideTitle={plate?.hideTitle}
                     logoScale={logoScale} panelTop={panelTop} panelBottom={panelBottom} panelWidth={panelWidth} panelAlign={panelAlign}
-                    scriptOverride={scriptFor(gi)} variant={variantFor(gi)} />
+                    scriptOverride={scriptFor(gi)} variant={variantFor(gi)}
+                    showHeader={showHeader} headerPeriod={headerPeriod} headerTarget={headerTarget} showDiscount={showDiscount} />
                 </div>
               </div>
 
@@ -225,7 +240,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
           <Poster ref={captureRef} group={data.groups[cap.gi]} themeKey={themeFor(cap.gi)} sheet={data.sheet} width={size.w} height={size.h}
             bgUrl={plates[cap.gi]?.url} photoBg={!plates[cap.gi] ? themeBg(themeFor(cap.gi)) : undefined} hideTitle={plates[cap.gi]?.hideTitle}
             logoScale={logoScale} panelTop={panelTop} panelBottom={panelBottom} panelWidth={panelWidth} panelAlign={panelAlign}
-            scriptOverride={scriptFor(cap.gi)} variant={variantFor(cap.gi)} />
+            scriptOverride={scriptFor(cap.gi)} variant={variantFor(cap.gi)}
+            showHeader={showHeader} headerPeriod={headerPeriod} headerTarget={headerTarget} showDiscount={showDiscount} />
         )}
       </div>
     </div>
