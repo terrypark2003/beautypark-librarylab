@@ -29,7 +29,7 @@
 .en { font-family: "Playfair Display", serif; }
 
 .poster .top { position: relative; display: flex; justify-content: space-between; align-items: flex-start; }
-.poster .logo-img { height: calc(2.7em * var(--logo-scale, 1)); width: auto; max-width: 80%; object-fit: contain; display: block; }
+.poster .logo-img { height: calc(2.7em * var(--logo-scale, 1)); width: auto; max-width: 94%; object-fit: contain; display: block; }
 .poster.has-photo .logo-img { filter: drop-shadow(0 .06em .45em rgba(0,0,0,.45)); }
 .poster .logo { display: flex; align-items: center; gap: .44em; }
 .poster .logo .mark { width: 1.7em; height: 2em; border: .06em solid var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: "Playfair Display", serif; font-weight: 700; font-size: 1.05em; color: var(--accent-deep); }
@@ -50,7 +50,7 @@
 .poster .title { font-weight: 800; font-size: 2.3em; line-height: 1.14; letter-spacing: -.01em; }
 .poster .title .l2 { display: block; color: var(--accent-deep); }
 
-.poster .panel { background: var(--panel); border-radius: 1.05em; box-shadow: 0 .7em 1.8em rgba(80,66,48,.13); display: flex; flex-direction: column; padding: .45em 0; transform: scale(var(--panel-scale, 1)); transform-origin: center; }
+.poster .panel { background: var(--panel); border-radius: 1.05em; box-shadow: 0 .7em 1.8em rgba(80,66,48,.13); display: flex; flex-direction: column; padding: .45em 0; margin-top: calc(var(--panel-top, 0) * 1em); margin-bottom: calc(var(--panel-bottom, 0) * 1em); }
 .poster .body > .panel { width: 100%; }
 .poster:not(.land) .body > .panel { flex: 1; }
 .poster.land .body > .panel { flex: 1.15; align-self: stretch; max-height: 100%; }
@@ -73,3 +73,25 @@
 .poster.has-photo .spk { fill: #fff; opacity: .85; }
 .poster.has-photo .foot { color: #fff; text-shadow: 0 .06em .3em rgba(0,0,0,.5); }
 .poster.has-photo .vat { border-color: rgba(255,255,255,.67); color: #fff; }
+
+/* ===== 레이아웃 변형 ===== */
+/* center: 타이틀 가운데 정렬 + 패널 약간 좁게 */
+.poster.v-center .head { text-align: center; align-items: center; }
+.poster.v-center .badge { margin-left: auto; margin-right: auto; }
+.poster.v-center:not(.land) .panel { width: 90%; align-self: center; }
+
+/* band: 타이틀을 컬러 밴드 안에 */
+.poster.v-band .head { background: var(--accent-deep); border-radius: .9em; padding: .9em 1em; }
+.poster.v-band .head .title, .poster.v-band .head .title .l2, .poster.v-band .head .sup { color: #fff !important; text-shadow: none; }
+.poster.v-band .head .script { color: rgba(255,255,255,.92) !important; }
+.poster.v-band.has-photo .head { box-shadow: 0 .4em 1.4em rgba(0,0,0,.25); }
+
+/* editorial: 큰 스크립트 + 작은 타이틀 + 좌측 액센트 바 */
+.poster.v-editorial .head { border-left: .22em solid var(--accent); padding-left: .7em; }
+.poster.v-editorial .script { font-size: 3.1em; }
+.poster.v-editorial .title { font-size: 1.85em; }
+
+/* minimal: 스크립트 숨김, 타이틀 컴팩트, 패널 강조 */
+.poster.v-minimal .script { display: none; }
+.poster.v-minimal .title { font-size: 1.7em; font-weight: 700; }
+.poster.v-minimal .body { gap: .7em; }

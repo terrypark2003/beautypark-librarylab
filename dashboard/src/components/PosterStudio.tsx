@@ -19,6 +19,14 @@ const SIZES = [
   { key: "wide", label: "가로 팝업 16:9 (1200×675)", w: 1200, h: 675 },
 ] as const;
 
+const LAYOUTS = [
+  { key: "classic", label: "기본" },
+  { key: "center", label: "센터" },
+  { key: "band", label: "밴드" },
+  { key: "editorial", label: "에디토리얼" },
+  { key: "minimal", label: "미니멀" },
+] as const;
+
 const PREVIEW_W = 330;
 
 export default function PosterStudio({ initialData }: { initialData?: RequestData | null }) {
@@ -31,7 +39,9 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [plates, setPlates] = useState<Record<number, Plate>>({});
   const [sizeKey, setSizeKey] = useState<string>("portrait");
   const [logoScale, setLogoScale] = useState(1);
-  const [panelScale, setPanelScale] = useState(1);
+  const [panelTop, setPanelTop] = useState(0);
+  const [panelBottom, setPanelBottom] = useState(0);
+  const [variants, setVariants] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -39,6 +49,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
 
   const size = SIZES.find((s) => s.key === sizeKey)!;
   const themeFor = (gi: number) => themes[gi] ?? themeKeyForGroup(data.groups[gi]?.group ?? "");
+  const variantFor = (gi: number) => variants[gi] ?? LAYOUTS[gi % LAYOUTS.length].key;
 
   useMemo(() => { setThemes({}); setPlates({}); }, [data]);
   useEffect(() => { if (initialData) { setData(initialData); setSource(`기획 · ${initialData.sheet}`); } }, [initialData]);
@@ -130,12 +141,16 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         <p className="mt-2 text-xs text-charcoal/55">💡 사이즈를 먼저 고르고, 각 포스터에 <b>배경</b>을 올리면 그 위에 타이틀·가격이 합성됩니다. 배경에 이미 타이틀이 있으면 “타이틀 숨김”을 켜세요.</p>
         <div className="mt-2 flex flex-wrap gap-5 text-xs text-charcoal/70">
           <label className="flex items-center gap-2">로고 크기
-            <input type="range" min={0.6} max={1.8} step={0.05} value={logoScale} onChange={(e) => setLogoScale(Number(e.target.value))} className="w-32 accent-taupe" />
+            <input type="range" min={0.6} max={3} step={0.05} value={logoScale} onChange={(e) => setLogoScale(Number(e.target.value))} className="w-32 accent-taupe" />
             <span className="w-9 tabular-nums">{Math.round(logoScale * 100)}%</span>
           </label>
-          <label className="flex items-center gap-2">패널 크기
-            <input type="range" min={0.7} max={1.15} step={0.01} value={panelScale} onChange={(e) => setPanelScale(Number(e.target.value))} className="w-32 accent-taupe" />
-            <span className="w-9 tabular-nums">{Math.round(panelScale * 100)}%</span>
+          <label className="flex items-center gap-2">패널 상단 ↓
+            <input type="range" min={0} max={14} step={0.5} value={panelTop} onChange={(e) => setPanelTop(Number(e.target.value))} className="w-28 accent-taupe" />
+            <span className="w-6 tabular-nums">{panelTop}</span>
+          </label>
+          <label className="flex items-center gap-2">패널 하단 ↑
+            <input type="range" min={0} max={14} step={0.5} value={panelBottom} onChange={(e) => setPanelBottom(Number(e.target.value))} className="w-28 accent-taupe" />
+            <span className="w-6 tabular-nums">{panelBottom}</span>
           </label>
         </div>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
@@ -150,21 +165,23 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                 <div style={previewInner}>
                   <Poster group={g} themeKey={themeFor(gi)} sheet={data.sheet} width={size.w} height={size.h}
                     bgUrl={plate?.url} photoBg={!plate ? themeBg(themeFor(gi)) : undefined} hideTitle={plate?.hideTitle}
-                    logoScale={logoScale} panelScale={panelScale} />
+                    logoScale={logoScale} panelTop={panelTop} panelBottom={panelBottom} variant={variantFor(gi)} />
                 </div>
               </div>
 
-              <div className="flex w-[330px] items-center gap-2">
+              <div className="flex w-[330px] items-center gap-1.5">
                 {!plate ? (
-                  <select value={themeFor(gi)} onChange={(e) => setThemes((m) => ({ ...m, [gi]: e.target.value }))} className="flex-1 rounded-md border border-taupe/40 bg-white px-2 py-1.5 text-xs">
+                  <select value={themeFor(gi)} onChange={(e) => setThemes((m) => ({ ...m, [gi]: e.target.value }))} className="min-w-0 flex-1 rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
                     {THEME_LIST.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
                   </select>
                 ) : (
-                  <label className="flex flex-1 items-center gap-2 rounded-md border border-taupe/30 bg-white px-2 py-1.5 text-xs text-charcoal/75">
-                    <input type="checkbox" checked={plate.hideTitle} onChange={() => toggleHide(gi)} className="accent-taupe" />
-                    타이틀 숨김 (배경에 타이틀 포함됨)
+                  <label className="flex min-w-0 flex-1 items-center gap-1 rounded-md border border-taupe/30 bg-white px-1.5 py-1.5 text-xs text-charcoal/75">
+                    <input type="checkbox" checked={plate.hideTitle} onChange={() => toggleHide(gi)} className="accent-taupe" />타이틀 숨김
                   </label>
                 )}
+                <select value={variantFor(gi)} onChange={(e) => setVariants((m) => ({ ...m, [gi]: e.target.value }))} title="레이아웃" className="rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
+                  {LAYOUTS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}
+                </select>
                 <button onClick={() => downloadOne(gi)} className="rounded-md bg-taupe px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-taupe-deep">PNG</button>
               </div>
 
@@ -184,7 +201,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         {cap && (
           <Poster ref={captureRef} group={data.groups[cap.gi]} themeKey={themeFor(cap.gi)} sheet={data.sheet} width={size.w} height={size.h}
             bgUrl={plates[cap.gi]?.url} photoBg={!plates[cap.gi] ? themeBg(themeFor(cap.gi)) : undefined} hideTitle={plates[cap.gi]?.hideTitle}
-            logoScale={logoScale} panelScale={panelScale} />
+            logoScale={logoScale} panelTop={panelTop} panelBottom={panelBottom} variant={variantFor(cap.gi)} />
         )}
       </div>
     </div>

@@ -20,11 +20,13 @@ interface Props {
   width?: number;
   height?: number;
   logoScale?: number; // 로고 크기 배율
-  panelScale?: number; // 가격 패널 크기 배율
+  panelTop?: number; // 패널 상단 여백(em)
+  panelBottom?: number; // 패널 하단 여백(em)
+  variant?: string; // 레이아웃 변형: classic|center|band|editorial|minimal
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelScale = 1 }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, variant = "classic" }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const t = theme.tokens;
     const h = theme.headline(group);
@@ -38,7 +40,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
       ["--w" as any]: width,
       ["--h" as any]: height,
       ["--logo-scale" as any]: logoScale,
-      ["--panel-scale" as any]: panelScale,
+      ["--panel-top" as any]: panelTop,
+      ["--panel-bottom" as any]: panelBottom,
       ["--bg" as any]: t.bg,
       ["--blob" as any]: t.blob,
       ["--ink" as any]: t.ink,
@@ -51,7 +54,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     };
 
     return (
-      <div ref={ref} className={`poster${photo ? " has-photo" : ""}${land ? " land" : ""}`} style={styleVars}>
+      <div ref={ref} className={`poster v-${variant}${photo ? " has-photo" : ""}${land ? " land" : ""}`} style={styleVars}>
         {photo ? (
           <div className="photo" style={{ backgroundImage: `url(${photo})` }} />
         ) : (
