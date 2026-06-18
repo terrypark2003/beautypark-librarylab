@@ -7,6 +7,7 @@ import { loadWorkbook, parseSheet } from "../lib/parseRequest";
 import { THEMES, THEME_LIST, themeKeyForGroup } from "../lib/themes";
 import { themeBg } from "../lib/backgrounds";
 import type { Sticker } from "../lib/poster";
+import { searchStock, stockToDataUrl, type StockPhoto } from "../lib/stock";
 import { Poster } from "./Poster";
 
 const STICKERS = ["✦", "✧", "★", "❀", "✿", "❤", "☀", "✨", "🌸", "🍑", "🌿", "💧"];
@@ -65,6 +66,12 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [selSticker, setSelSticker] = useState<{ gi: number; id: string } | null>(null);
   const dragRef = useRef<{ gi: number; tag: string; sx: number; sy: number; scale: number; base: any } | null>(null);
   const [sizeKey, setSizeKey] = useState<string>("portrait");
+  // 스톡 사진 검색
+  const [stockGi, setStockGi] = useState<number | null>(null);
+  const [stockQ, setStockQ] = useState("");
+  const [stockResults, setStockResults] = useState<StockPhoto[]>([]);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockNote, setStockNote] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -129,6 +136,23 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     setSelSticker(null);
   };
   const resetPanel = (gi: number) => setOffsets((m) => ({ ...m, [gi]: { dx: 0, dy: 0 } }));
+
+  async function runStock() {
+    if (!stockQ.trim()) return;
+    setStockLoading(true);
+    const res = await searchStock(stockQ.trim(), size.w > size.h ? "landscape" : "portrait");
+    setStockResults(res.results); setStockNote(res.note); setStockLoading(false);
+  }
+  async function pickStock(ph: StockPhoto) {
+    if (stockGi == null) return;
+    setStockLoading(true);
+    try {
+      const data = await stockToDataUrl(ph.url);
+      setPlates((m) => ({ ...m, [stockGi]: { url: data, hideTitle: false } }));
+      setStockGi(null);
+    } catch (e) { setStockNote(`적용 실패: ${(e as Error).message}`); }
+    finally { setStockLoading(false); }
+  }
   useEffect(() => { if (initialData) { setData(initialData); setSource(`기획 · ${initialData.sheet}`); } }, [initialData]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -264,8 +288,9 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   {plate ? "배경 변경" : "배경 업로드"}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => onPlate(gi, e.target.files?.[0])} />
                 </label>
+                <button onClick={() => { setStockGi(gi); setStockResults([]); setStockNote(undefined); }} className="rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-taupe-deep hover:bg-taupe/10">🔍 사진</button>
                 {plate && <button onClick={() => removePlate(gi)} className="rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-charcoal/60 hover:bg-taupe/10">제거</button>}
-                <button onClick={() => setOpenOpts((m) => ({ ...m, [gi]: !m[gi] }))} className={`rounded-md border px-2 py-1.5 text-xs ${openOpts[gi] ? "border-taupe bg-taupe text-white" : "border-taupe/40 text-taupe-deep hover:bg-taupe/10"}`}>⚙ 옵션</button>
+                <button onClick={() => setOpenOpts((m) => ({ ...m, [gi]: !m[gi] }))} className={`rounded-md border px-2 py-1.5 text-xs ${openOpts[gi] ? "border-taupe bg-taupe text-white" : "border-taupe/40 text-taupe-deep hover:bg-taupe/10"}`}>⚙</button>
               </div>
 
               <div className="flex w-[330px] items-center gap-2">
@@ -315,6 +340,29 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
           );
         })}
       </div>
+
+      {stockGi !== null && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setStockGi(null)}>
+          <div className="mt-10 w-full max-w-3xl rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <h3 className="font-serif text-lg text-taupe-deep">무료 사진 검색 → 배경</h3>
+              <input value={stockQ} onChange={(e) => setStockQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runStock()} placeholder="예: summer beach, water, flower, sky, marble, skincare" className="min-w-[200px] flex-1 rounded-md border border-taupe/30 px-3 py-1.5 text-sm" />
+              <button onClick={runStock} disabled={stockLoading} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep disabled:opacity-50">{stockLoading ? "…" : "검색"}</button>
+              <button onClick={() => setStockGi(null)} className="rounded-md border border-taupe/30 px-3 py-1.5 text-sm text-charcoal/70">닫기</button>
+            </div>
+            {stockNote && <p className="mb-2 text-xs text-charcoal/50">{stockNote}</p>}
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {stockResults.map((ph) => (
+                <button key={ph.id} onClick={() => pickStock(ph)} title={ph.credit} className="group relative aspect-[3/4] overflow-hidden rounded-md border border-taupe/15 hover:ring-2 hover:ring-taupe">
+                  <img src={ph.thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  <span className="absolute inset-x-0 bottom-0 truncate bg-black/45 px-1 py-0.5 text-[9px] text-white opacity-0 group-hover:opacity-100">{ph.credit}</span>
+                </button>
+              ))}
+            </div>
+            {stockResults.length === 0 && !stockLoading && <p className="py-8 text-center text-sm text-charcoal/40">검색어를 입력하고 Enter/검색. (무료: Openverse 기본 · Pexels 키 연결 시 고품질)</p>}
+          </div>
+        </div>
+      )}
 
       <div style={{ position: "fixed", left: -30000, top: 0, pointerEvents: "none" }} aria-hidden>
         {cap && <Poster ref={captureRef} {...posterProps(cap.gi)} />}
