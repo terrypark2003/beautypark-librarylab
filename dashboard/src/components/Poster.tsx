@@ -2,6 +2,7 @@ import { forwardRef } from "react";
 import type { EventGroup } from "../lib/types";
 import { THEMES } from "../lib/themes";
 import { manwon, eventPrice, normalPrice, validItems } from "../lib/poster";
+import { logoUrl, logoWhiteUrl } from "../lib/logo";
 
 const Spark = ({ cls }: { cls: string }) => (
   <svg className={`spk ${cls}`} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -63,13 +64,16 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
             <Spark cls="s2" />
             <Spark cls="s3" />
             <div className="top">
-              <div className="logo">
-                <div className="mark">B</div>
-                <div>
-                  <div className="wm">BEAUTY PARK</div>
-                  <div className="sub">뷰티파크의원 범어점</div>
+              {logoUrl ? (
+                <img className="logo-img" src={photo && logoWhiteUrl ? logoWhiteUrl : logoUrl} alt="BEAUTY PARK 뷰티파크의원 범어점" />
+              ) : (
+                <div className="logo">
+                  <div>
+                    <div className="wm">BEAUTY PARK</div>
+                    <div className="sub">뷰티파크의원 범어점</div>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="branch">
                 EVENT · {sheet}
                 <b>BEOMEO</b>
