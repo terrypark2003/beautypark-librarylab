@@ -11,6 +11,22 @@ import { Poster } from "./Poster";
 const sanitize = (s: string) => s.replace(/[\\/:*?"<>|\n]/g, "").replace(/\s+/g, "").slice(0, 36);
 type Plate = { url: string; hideTitle: boolean };
 
+interface Opts {
+  logoScale: number;
+  panelTop: number;
+  panelBottom: number;
+  panelWidth: number;
+  panelAlign: "left" | "center" | "right";
+  showHeader: boolean;
+  headerPeriod: string;
+  headerTarget: string;
+  showDiscount: boolean;
+}
+const DEFAULT_OPTS: Opts = {
+  logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
+  showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false,
+};
+
 const SIZES = [
   { key: "portrait", label: "세로 포스터 (1080×1527)", w: 1080, h: 1527 },
   { key: "insta45", label: "인스타 4:5 (1080×1350)", w: 1080, h: 1350 },
@@ -20,11 +36,8 @@ const SIZES = [
 ] as const;
 
 const LAYOUTS = [
-  { key: "classic", label: "기본" },
-  { key: "center", label: "센터" },
-  { key: "band", label: "밴드" },
-  { key: "editorial", label: "에디토리얼" },
-  { key: "minimal", label: "미니멀" },
+  { key: "classic", label: "기본" }, { key: "center", label: "센터" }, { key: "band", label: "밴드" },
+  { key: "editorial", label: "에디토리얼" }, { key: "minimal", label: "미니멀" },
 ] as const;
 
 const PREVIEW_W = 330;
@@ -37,18 +50,11 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [error, setError] = useState<string | null>(null);
   const [themes, setThemes] = useState<Record<number, string>>({});
   const [plates, setPlates] = useState<Record<number, Plate>>({});
-  const [sizeKey, setSizeKey] = useState<string>("portrait");
-  const [logoScale, setLogoScale] = useState(1);
-  const [panelTop, setPanelTop] = useState(0);
-  const [panelBottom, setPanelBottom] = useState(0);
   const [variants, setVariants] = useState<Record<number, string>>({});
-  const [panelWidth, setPanelWidth] = useState(100);
-  const [panelAlign, setPanelAlign] = useState<"left" | "center" | "right">("center");
   const [scripts, setScripts] = useState<Record<number, string>>({});
-  const [showHeader, setShowHeader] = useState(false);
-  const [headerPeriod, setHeaderPeriod] = useState("");
-  const [headerTarget, setHeaderTarget] = useState("카카오톡 플러스 친구 대상");
-  const [showDiscount, setShowDiscount] = useState(false);
+  const [opts, setOpts] = useState<Record<number, Opts>>({});
+  const [openOpts, setOpenOpts] = useState<Record<number, boolean>>({});
+  const [sizeKey, setSizeKey] = useState<string>("portrait");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -62,8 +68,10 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     return g ? (THEMES[themeFor(gi)] || THEMES.summer).headline(g).script ?? "" : "";
   };
   const scriptFor = (gi: number) => (scripts[gi] !== undefined ? scripts[gi] : defaultScript(gi));
+  const O = (gi: number): Opts => ({ ...DEFAULT_OPTS, ...(opts[gi] || {}) });
+  const setO = (gi: number, patch: Partial<Opts>) => setOpts((m) => ({ ...m, [gi]: { ...DEFAULT_OPTS, ...(m[gi] || {}), ...patch } }));
 
-  useMemo(() => { setThemes({}); setPlates({}); }, [data]);
+  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); }, [data]);
   useEffect(() => { if (initialData) { setData(initialData); setSource(`기획 · ${initialData.sheet}`); } }, [initialData]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -98,7 +106,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     (async () => {
       try {
         await (document as any).fonts?.ready;
-        await new Promise((r) => setTimeout(r, 140));
+        await new Promise((r) => setTimeout(r, 150));
         const node = captureRef.current;
         if (node && !cancelled) {
           const url = await toPng(node, { pixelRatio: size.w >= 1600 ? 1.5 : 2, width: size.w, height: size.h, cacheBust: true });
@@ -128,6 +136,18 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const previewWrap = (w: number, h: number): React.CSSProperties => ({ width: PREVIEW_W, height: (PREVIEW_W * h) / w, overflow: "hidden", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,.12)" });
   const previewInner: React.CSSProperties = { transform: `scale(${PREVIEW_W / size.w})`, transformOrigin: "top left" };
 
+  const posterProps = (gi: number) => {
+    const plate = plates[gi];
+    const o = O(gi);
+    return {
+      group: data.groups[gi], themeKey: themeFor(gi), sheet: data.sheet, width: size.w, height: size.h,
+      bgUrl: plate?.url, photoBg: !plate ? themeBg(themeFor(gi)) : undefined, hideTitle: plate?.hideTitle,
+      logoScale: o.logoScale, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
+      scriptOverride: scriptFor(gi), variant: variantFor(gi),
+      showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount,
+    };
+  };
+
   return (
     <div className="space-y-7">
       <div className="rounded-xl border border-taupe/20 bg-ivory p-5">
@@ -150,56 +170,18 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
             <button onClick={downloadAll} disabled={busy} className="rounded-md border border-taupe/40 bg-white px-4 py-2 text-sm font-semibold text-taupe-deep transition hover:bg-taupe/10 disabled:opacity-50">{busy ? "생성 중…" : "전체 PNG"}</button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-charcoal/55">💡 사이즈를 먼저 고르고, 각 포스터에 <b>배경</b>을 올리면 그 위에 타이틀·가격이 합성됩니다. 배경에 이미 타이틀이 있으면 “타이틀 숨김”을 켜세요.</p>
-        <div className="mt-2 flex flex-wrap gap-5 text-xs text-charcoal/70">
-          <label className="flex items-center gap-2">로고 크기
-            <input type="range" min={0.6} max={3} step={0.05} value={logoScale} onChange={(e) => setLogoScale(Number(e.target.value))} className="w-32 accent-taupe" />
-            <span className="w-9 tabular-nums">{Math.round(logoScale * 100)}%</span>
-          </label>
-          <label className="flex items-center gap-2">패널 상단 ↓
-            <input type="range" min={0} max={14} step={0.5} value={panelTop} onChange={(e) => setPanelTop(Number(e.target.value))} className="w-28 accent-taupe" />
-            <span className="w-6 tabular-nums">{panelTop}</span>
-          </label>
-          <label className="flex items-center gap-2">패널 하단 ↑
-            <input type="range" min={0} max={14} step={0.5} value={panelBottom} onChange={(e) => setPanelBottom(Number(e.target.value))} className="w-28 accent-taupe" />
-            <span className="w-6 tabular-nums">{panelBottom}</span>
-          </label>
-          <label className="flex items-center gap-2">패널 너비
-            <input type="range" min={40} max={100} step={2} value={panelWidth} onChange={(e) => setPanelWidth(Number(e.target.value))} className="w-28 accent-taupe" />
-            <span className="w-9 tabular-nums">{panelWidth}%</span>
-          </label>
-          <label className="flex items-center gap-2">패널 정렬
-            <select value={panelAlign} onChange={(e) => setPanelAlign(e.target.value as any)} className="rounded border border-taupe/40 bg-white px-1.5 py-1">
-              <option value="left">좌</option><option value="center">중</option><option value="right">우</option>
-            </select>
-          </label>
-          <label className="flex items-center gap-1.5"><input type="checkbox" checked={showDiscount} onChange={(e) => setShowDiscount(e.target.checked)} className="accent-taupe" />할인율 배지</label>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-charcoal/70">
-          <label className="flex items-center gap-1.5"><input type="checkbox" checked={showHeader} onChange={(e) => setShowHeader(e.target.checked)} className="accent-taupe" />패널 헤더 바</label>
-          {showHeader && (
-            <>
-              <input value={headerPeriod} onChange={(e) => setHeaderPeriod(e.target.value)} placeholder="기간 (예: 2026.08.01~08.31)" className="w-52 rounded border border-taupe/30 px-2 py-1" />
-              <input value={headerTarget} onChange={(e) => setHeaderTarget(e.target.value)} placeholder="대상" className="w-56 rounded border border-taupe/30 px-2 py-1" />
-            </>
-          )}
-        </div>
+        <p className="mt-2 text-xs text-charcoal/55">💡 사이즈를 고르고, 각 포스터의 <b>⚙ 세부옵션</b>에서 로고·패널·할인율·헤더를 <b>포스터별로</b> 조절하세요. 배경을 올리면 그 위에 합성됩니다.</p>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
       <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-3">
         {data.groups.map((g, gi) => {
           const plate = plates[gi];
+          const o = O(gi);
           return (
             <div key={gi} className="flex flex-col items-center gap-2.5">
               <div style={previewWrap(size.w, size.h)}>
-                <div style={previewInner}>
-                  <Poster group={g} themeKey={themeFor(gi)} sheet={data.sheet} width={size.w} height={size.h}
-                    bgUrl={plate?.url} photoBg={!plate ? themeBg(themeFor(gi)) : undefined} hideTitle={plate?.hideTitle}
-                    logoScale={logoScale} panelTop={panelTop} panelBottom={panelBottom} panelWidth={panelWidth} panelAlign={panelAlign}
-                    scriptOverride={scriptFor(gi)} variant={variantFor(gi)}
-                    showHeader={showHeader} headerPeriod={headerPeriod} headerTarget={headerTarget} showDiscount={showDiscount} />
-                </div>
+                <div style={previewInner}><Poster {...posterProps(gi)} /></div>
               </div>
 
               <div className="flex w-[330px] items-center gap-1.5">
@@ -224,25 +206,40 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => onPlate(gi, e.target.files?.[0])} />
                 </label>
                 {plate && <button onClick={() => removePlate(gi)} className="rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-charcoal/60 hover:bg-taupe/10">제거</button>}
+                <button onClick={() => setOpenOpts((m) => ({ ...m, [gi]: !m[gi] }))} className={`rounded-md border px-2 py-1.5 text-xs ${openOpts[gi] ? "border-taupe bg-taupe text-white" : "border-taupe/40 text-taupe-deep hover:bg-taupe/10"}`}>⚙ 옵션</button>
               </div>
 
               <div className="flex w-[330px] items-center gap-2">
                 <span className="shrink-0 text-[11px] text-charcoal/50">✎ 영문태그</span>
                 <input value={scriptFor(gi)} onChange={(e) => setScripts((m) => ({ ...m, [gi]: e.target.value }))} placeholder="예: Early Summer (빈칸=숨김)" className="min-w-0 flex-1 rounded-md border border-taupe/30 px-2 py-1 text-xs" />
               </div>
+
+              {openOpts[gi] && (
+                <div className="w-[330px] space-y-2 rounded-md border border-taupe/25 bg-ivory/60 p-3 text-[11px] text-charcoal/75">
+                  <label className="flex items-center gap-2">로고 크기<input type="range" min={0.6} max={3} step={0.05} value={o.logoScale} onChange={(e) => setO(gi, { logoScale: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.logoScale * 100)}%</span></label>
+                  <label className="flex items-center gap-2">패널 상단<input type="range" min={0} max={14} step={0.5} value={o.panelTop} onChange={(e) => setO(gi, { panelTop: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelTop}</span></label>
+                  <label className="flex items-center gap-2">패널 하단<input type="range" min={0} max={14} step={0.5} value={o.panelBottom} onChange={(e) => setO(gi, { panelBottom: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelBottom}</span></label>
+                  <label className="flex items-center gap-2">패널 너비<input type="range" min={40} max={100} step={2} value={o.panelWidth} onChange={(e) => setO(gi, { panelWidth: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelWidth}%</span></label>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1">정렬<select value={o.panelAlign} onChange={(e) => setO(gi, { panelAlign: e.target.value as any })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="left">좌</option><option value="center">중</option><option value="right">우</option></select></label>
+                    <label className="flex items-center gap-1"><input type="checkbox" checked={o.showDiscount} onChange={(e) => setO(gi, { showDiscount: e.target.checked })} className="accent-taupe" />할인율</label>
+                    <label className="flex items-center gap-1"><input type="checkbox" checked={o.showHeader} onChange={(e) => setO(gi, { showHeader: e.target.checked })} className="accent-taupe" />헤더바</label>
+                  </div>
+                  {o.showHeader && (
+                    <div className="space-y-1">
+                      <input value={o.headerPeriod} onChange={(e) => setO(gi, { headerPeriod: e.target.value })} placeholder="기간 (예: 2026.08.01~08.31)" className="w-full rounded border border-taupe/30 px-2 py-1" />
+                      <input value={o.headerTarget} onChange={(e) => setO(gi, { headerTarget: e.target.value })} placeholder="대상" className="w-full rounded border border-taupe/30 px-2 py-1" />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
       <div style={{ position: "fixed", left: -30000, top: 0, pointerEvents: "none" }} aria-hidden>
-        {cap && (
-          <Poster ref={captureRef} group={data.groups[cap.gi]} themeKey={themeFor(cap.gi)} sheet={data.sheet} width={size.w} height={size.h}
-            bgUrl={plates[cap.gi]?.url} photoBg={!plates[cap.gi] ? themeBg(themeFor(cap.gi)) : undefined} hideTitle={plates[cap.gi]?.hideTitle}
-            logoScale={logoScale} panelTop={panelTop} panelBottom={panelBottom} panelWidth={panelWidth} panelAlign={panelAlign}
-            scriptOverride={scriptFor(cap.gi)} variant={variantFor(cap.gi)}
-            showHeader={showHeader} headerPeriod={headerPeriod} headerTarget={headerTarget} showDiscount={showDiscount} />
-        )}
+        {cap && <Poster ref={captureRef} {...posterProps(cap.gi)} />}
       </div>
     </div>
   );

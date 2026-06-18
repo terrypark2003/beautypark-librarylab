@@ -34,6 +34,16 @@ interface Props {
 
 const ALIGN: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
 
+// 긴 시술명은 글자를 줄여 어색한 줄바꿈 방지
+function nameScale(name: string): number {
+  const L = name.length;
+  if (L <= 22) return 1;
+  if (L <= 30) return 0.9;
+  if (L <= 40) return 0.82;
+  if (L <= 52) return 0.74;
+  return 0.66;
+}
+
 export const Poster = forwardRef<HTMLDivElement, Props>(
   ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
@@ -125,7 +135,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
               const disc = n && e ? Math.round((1 - e / n) * 100) : 0;
               return (
                 <div className="row" key={i}>
-                  <div className="name">{it.name}</div>
+                  <div className="name" style={{ fontSize: `${nameScale(it.name)}em` }}>{it.name}</div>
                   <div className="price">
                     {showDiscount && disc > 0 && <span className="disc">{disc}%</span>}
                     {n != null && <span className="was">{manwon(n)}만원</span>}
