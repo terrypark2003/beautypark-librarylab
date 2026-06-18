@@ -52,7 +52,7 @@
 
 .poster .panel { background: var(--panel); border-radius: 1.05em; box-shadow: 0 .7em 1.8em rgba(80,66,48,.13); display: flex; flex-direction: column; padding: .45em 0; margin-top: calc(var(--panel-top, 0) * 1em); margin-bottom: calc(var(--panel-bottom, 0) * 1em); }
 .poster .body > .panel { width: 100%; }
-.poster:not(.land) .body > .panel { flex: 1; }
+.poster:not(.land) .body > .panel { flex: 1; width: calc(var(--panel-width, 100) * 1%); align-self: var(--panel-align, center); }
 .poster.land .body > .panel { flex: 1.15; align-self: stretch; max-height: 100%; }
 .poster .row { flex: 1; display: flex; align-items: center; justify-content: space-between; padding: 0 1.55em; border-bottom: 1px solid var(--divider); }
 .poster .row:last-child { border-bottom: 0; }
@@ -78,7 +78,6 @@
 /* center: 타이틀 가운데 정렬 + 패널 약간 좁게 */
 .poster.v-center .head { text-align: center; align-items: center; }
 .poster.v-center .badge { margin-left: auto; margin-right: auto; }
-.poster.v-center:not(.land) .panel { width: 90%; align-self: center; }
 
 /* band: 타이틀을 컬러 밴드 안에 */
 .poster.v-band .head { background: var(--accent-deep); border-radius: .9em; padding: .9em 1em; }

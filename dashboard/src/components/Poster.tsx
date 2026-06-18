@@ -22,11 +22,16 @@ interface Props {
   logoScale?: number; // 로고 크기 배율
   panelTop?: number; // 패널 상단 여백(em)
   panelBottom?: number; // 패널 하단 여백(em)
+  panelWidth?: number; // 패널 좌우 너비(%)
+  panelAlign?: "left" | "center" | "right"; // 패널 가로 정렬
+  scriptOverride?: string; // 영문 태그(스크립트) 직접 지정. undefined면 테마 기본값
   variant?: string; // 레이아웃 변형: classic|center|band|editorial|minimal
 }
 
+const ALIGN: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
+
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, variant = "classic" }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic" }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const t = theme.tokens;
     const h = theme.headline(group);
@@ -42,6 +47,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
       ["--logo-scale" as any]: logoScale,
       ["--panel-top" as any]: panelTop,
       ["--panel-bottom" as any]: panelBottom,
+      ["--panel-width" as any]: panelWidth,
+      ["--panel-align" as any]: ALIGN[panelAlign] || "center",
       ["--bg" as any]: t.bg,
       ["--blob" as any]: t.blob,
       ["--ink" as any]: t.ink,
@@ -92,7 +99,9 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
         <div className="body">
           {showTitle && (
             <div className="head">
-              {h.script && <div className="script en">{h.script}</div>}
+              {(scriptOverride !== undefined ? scriptOverride : h.script) && (
+                <div className="script en">{scriptOverride !== undefined ? scriptOverride : h.script}</div>
+              )}
               {h.sup && <div className="sup">{h.sup}</div>}
               {h.badge && <div className="badge">{h.badge}</div>}
               <div className="title">

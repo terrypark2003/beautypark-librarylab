@@ -1,20 +1,21 @@
 // Vercel 서버리스: 이벤트 타이틀 추천. GEMINI_API_KEY 우선 시도 → 실패/미설정 시 ANTHROPIC_API_KEY.
 // 둘 다 없거나 오류면 빈 배열 반환 → 프론트가 오프라인 추천으로 폴백.
 
-function buildPrompt(month: string, treatments: string[], description: string): string {
+function buildPrompt(month: string, treatments: string[], description: string, examples: string[]): string {
   return `너는 대구 수성구 피부과 "뷰티파크의원 범어점"의 베테랑 마케팅 카피라이터다.
-아래 한 이벤트 그룹에 어울리는 매력적인 한국어 이벤트 타이틀 5개를 제안해라.
+아래 한 이벤트 그룹에 어울리는 **감각적이고 클릭하고 싶은** 한국어 이벤트 타이틀 6개를 제안해라.
 
 [대상 월] ${month}
 [구성 시술]
 ${treatments.map((t) => `- ${t}`).join("\n") || "- (미입력)"}
 ${description ? `[기획자 설명/의도] ${description}` : ""}
+${examples.length ? `\n[우리 클리닉이 실제 써온 타이틀 — 이 톤·리듬·작명 스타일을 학습해서 비슷한 결로 새로 지어라]\n${examples.slice(0, 14).map((e) => `- ${e}`).join("\n")}` : ""}
 
-규칙:
-- 톤: 고급스럽고 간결하며 계절감/혜택감이 느껴지게.
-- 길이: 6~18자. 과장·의학적 효과 보장 표현 금지.
-- 영문/한글 혼용 가능(예: LUCKY 7 FESTA, 예뻐지는 화수목 이벤트).
-- 결과는 **JSON 문자열 배열만** 출력. 설명 금지. 예: ["타이틀1","타이틀2","타이틀3","타이틀4","타이틀5"]`;
+작명 가이드:
+- 위 예시들의 분위기(고급+위트, 계절감, 영문 키워드 활용)를 그대로 살려라. 단, 예시를 그대로 베끼지 말고 새로 지어라.
+- 다양한 스타일을 섞어라: (a) 영문 캐치프레이즈형(예: LUCKY 7 FESTA, COOL SUMMER) (b) 감성 한글형(예: 예뻐지는 화수목, 가장 빛나는 바캉스) (c) 혜택 강조형.
+- 길이 6~18자. 과장·치료효과 보장·최상급 표현 금지. 시술 성분/효능을 은근히 녹여라.
+- 결과는 **JSON 문자열 배열만** 출력(설명·번호 금지). 예: ["타이틀1","타이틀2","타이틀3","타이틀4","타이틀5","타이틀6"]`;
 }
 
 function parseTitles(text: string): string[] {
@@ -79,7 +80,8 @@ export default async function handler(req: any, res: any) {
   const month: string = body?.month || "";
   const treatments: string[] = Array.isArray(body?.treatments) ? body.treatments : [];
   const description: string = body?.description || "";
-  const prompt = buildPrompt(month, treatments, description);
+  const examples: string[] = Array.isArray(body?.examples) ? body.examples.filter((e: any) => typeof e === "string") : [];
+  const prompt = buildPrompt(month, treatments, description, examples);
 
   let text: string | null = null;
   let via = "";

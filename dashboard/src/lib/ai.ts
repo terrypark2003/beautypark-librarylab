@@ -16,14 +16,22 @@ function keyword(treatments: string[]): string {
   return "스페셜";
 }
 
-function fallback(input: { month: string; treatments: string[] }): string[] {
+function fallback(input: { month: string; treatments: string[]; examples?: string[] }): string[] {
   const m = Number(input.month.split(".")[1] || "0");
   const s = SEASON[m] || "이달의";
   const kw = keyword(input.treatments);
-  return [`${s} ${kw} 페스타`, `${s} 스페셜 이벤트`, `${kw} 집중 ${m}월 이벤트`, `${s} 뷰티 위크`];
+  const ex = (input.examples || []).filter((t) => t && t.length <= 18);
+  const out = [
+    `${s} ${kw} 페스타`,
+    `${kw} 집중 ${m}월 스페셜`,
+    `${s} 뷰티 위크`,
+    `${kw} PICK ${m} EVENT`,
+    ...ex.slice(0, 2), // 과거 실제 타이틀 일부(스타일 참고용)
+  ];
+  return Array.from(new Set(out)).slice(0, 6);
 }
 
-export async function suggestTitles(input: { month: string; treatments: string[]; description?: string }): Promise<TitleResult> {
+export async function suggestTitles(input: { month: string; treatments: string[]; description?: string; examples?: string[] }): Promise<TitleResult> {
   try {
     const r = await fetch("/api/title", {
       method: "POST",

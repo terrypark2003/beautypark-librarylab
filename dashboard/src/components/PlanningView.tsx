@@ -40,7 +40,8 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
   const openAi = (gi: number) => { setAiFor(gi); setAiTitles([]); setAiDesc(""); setAiNote(undefined); };
   async function runAi(gi: number) {
     setAiLoading(true);
-    const res = await suggestTitles({ month: key(y, m), treatments: plan[gi].items.map((i) => i.name).filter(Boolean), description: aiDesc });
+    const examples = Array.from(new Set(Object.values(effHistory).flatMap((hm) => hm.groups.map((g) => g.group.trim())))).filter(Boolean).slice(0, 40);
+    const res = await suggestTitles({ month: key(y, m), treatments: plan[gi].items.map((i) => i.name).filter(Boolean), description: aiDesc, examples });
     setAiTitles(res.titles); setAiNote(res.note); setAiLoading(false);
   }
   const applyTitle = (gi: number, t: string) => { up((p) => { p[gi].group = t; return p; }); setAiFor(null); };

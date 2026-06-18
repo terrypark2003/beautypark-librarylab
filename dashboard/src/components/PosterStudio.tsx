@@ -4,7 +4,7 @@ import { toPng } from "html-to-image";
 import type { RequestData } from "../lib/types";
 import { sampleData } from "../lib/sample";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
-import { THEME_LIST, themeKeyForGroup } from "../lib/themes";
+import { THEMES, THEME_LIST, themeKeyForGroup } from "../lib/themes";
 import { themeBg } from "../lib/backgrounds";
 import { Poster } from "./Poster";
 
@@ -42,6 +42,9 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [panelTop, setPanelTop] = useState(0);
   const [panelBottom, setPanelBottom] = useState(0);
   const [variants, setVariants] = useState<Record<number, string>>({});
+  const [panelWidth, setPanelWidth] = useState(100);
+  const [panelAlign, setPanelAlign] = useState<"left" | "center" | "right">("center");
+  const [scripts, setScripts] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -50,6 +53,11 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const size = SIZES.find((s) => s.key === sizeKey)!;
   const themeFor = (gi: number) => themes[gi] ?? themeKeyForGroup(data.groups[gi]?.group ?? "");
   const variantFor = (gi: number) => variants[gi] ?? LAYOUTS[gi % LAYOUTS.length].key;
+  const defaultScript = (gi: number) => {
+    const g = data.groups[gi];
+    return g ? (THEMES[themeFor(gi)] || THEMES.summer).headline(g).script ?? "" : "";
+  };
+  const scriptFor = (gi: number) => (scripts[gi] !== undefined ? scripts[gi] : defaultScript(gi));
 
   useMemo(() => { setThemes({}); setPlates({}); }, [data]);
   useEffect(() => { if (initialData) { setData(initialData); setSource(`기획 · ${initialData.sheet}`); } }, [initialData]);
@@ -152,6 +160,15 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
             <input type="range" min={0} max={14} step={0.5} value={panelBottom} onChange={(e) => setPanelBottom(Number(e.target.value))} className="w-28 accent-taupe" />
             <span className="w-6 tabular-nums">{panelBottom}</span>
           </label>
+          <label className="flex items-center gap-2">패널 너비
+            <input type="range" min={40} max={100} step={2} value={panelWidth} onChange={(e) => setPanelWidth(Number(e.target.value))} className="w-28 accent-taupe" />
+            <span className="w-9 tabular-nums">{panelWidth}%</span>
+          </label>
+          <label className="flex items-center gap-2">패널 정렬
+            <select value={panelAlign} onChange={(e) => setPanelAlign(e.target.value as any)} className="rounded border border-taupe/40 bg-white px-1.5 py-1">
+              <option value="left">좌</option><option value="center">중</option><option value="right">우</option>
+            </select>
+          </label>
         </div>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
@@ -165,7 +182,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                 <div style={previewInner}>
                   <Poster group={g} themeKey={themeFor(gi)} sheet={data.sheet} width={size.w} height={size.h}
                     bgUrl={plate?.url} photoBg={!plate ? themeBg(themeFor(gi)) : undefined} hideTitle={plate?.hideTitle}
-                    logoScale={logoScale} panelTop={panelTop} panelBottom={panelBottom} variant={variantFor(gi)} />
+                    logoScale={logoScale} panelTop={panelTop} panelBottom={panelBottom} panelWidth={panelWidth} panelAlign={panelAlign}
+                    scriptOverride={scriptFor(gi)} variant={variantFor(gi)} />
                 </div>
               </div>
 
@@ -192,6 +210,11 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                 </label>
                 {plate && <button onClick={() => removePlate(gi)} className="rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-charcoal/60 hover:bg-taupe/10">제거</button>}
               </div>
+
+              <div className="flex w-[330px] items-center gap-2">
+                <span className="shrink-0 text-[11px] text-charcoal/50">✎ 영문태그</span>
+                <input value={scriptFor(gi)} onChange={(e) => setScripts((m) => ({ ...m, [gi]: e.target.value }))} placeholder="예: Early Summer (빈칸=숨김)" className="min-w-0 flex-1 rounded-md border border-taupe/30 px-2 py-1 text-xs" />
+              </div>
             </div>
           );
         })}
@@ -201,7 +224,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         {cap && (
           <Poster ref={captureRef} group={data.groups[cap.gi]} themeKey={themeFor(cap.gi)} sheet={data.sheet} width={size.w} height={size.h}
             bgUrl={plates[cap.gi]?.url} photoBg={!plates[cap.gi] ? themeBg(themeFor(cap.gi)) : undefined} hideTitle={plates[cap.gi]?.hideTitle}
-            logoScale={logoScale} panelTop={panelTop} panelBottom={panelBottom} variant={variantFor(cap.gi)} />
+            logoScale={logoScale} panelTop={panelTop} panelBottom={panelBottom} panelWidth={panelWidth} panelAlign={panelAlign}
+            scriptOverride={scriptFor(cap.gi)} variant={variantFor(cap.gi)} />
         )}
       </div>
     </div>
