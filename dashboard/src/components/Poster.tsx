@@ -19,10 +19,12 @@ interface Props {
   hideTitle?: boolean; // 배경에 타이틀이 이미 포함된 경우 앱 타이틀/로고 숨김
   width?: number;
   height?: number;
+  logoScale?: number; // 로고 크기 배율
+  panelScale?: number; // 가격 패널 크기 배율
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527 }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelScale = 1 }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const t = theme.tokens;
     const h = theme.headline(group);
@@ -35,6 +37,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     const styleVars = {
       ["--w" as any]: width,
       ["--h" as any]: height,
+      ["--logo-scale" as any]: logoScale,
+      ["--panel-scale" as any]: panelScale,
       ["--bg" as any]: t.bg,
       ["--blob" as any]: t.blob,
       ["--ink" as any]: t.ink,

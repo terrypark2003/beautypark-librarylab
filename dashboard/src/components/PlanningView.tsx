@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import type { RequestData } from "../lib/types";
 import { references, latest, nextMonth, key, label, history, type HMonth } from "../lib/history";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
+import { suggestTitles } from "../lib/ai";
 
 interface PItem { name: string; normal: string; event: string }
 interface PGroup { group: string; items: PItem[] }
@@ -28,6 +29,21 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
   const [overrides, setOverrides] = useState<Record<string, HMonth>>({});
   const [ovError, setOvError] = useState<string | null>(null);
   const ovRef = useRef<HTMLInputElement>(null);
+
+  // AI 타이틀 추천
+  const [aiFor, setAiFor] = useState<number | null>(null);
+  const [aiDesc, setAiDesc] = useState("");
+  const [aiTitles, setAiTitles] = useState<string[]>([]);
+  const [aiNote, setAiNote] = useState<string | undefined>();
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const openAi = (gi: number) => { setAiFor(gi); setAiTitles([]); setAiDesc(""); setAiNote(undefined); };
+  async function runAi(gi: number) {
+    setAiLoading(true);
+    const res = await suggestTitles({ month: key(y, m), treatments: plan[gi].items.map((i) => i.name).filter(Boolean), description: aiDesc });
+    setAiTitles(res.titles); setAiNote(res.note); setAiLoading(false);
+  }
+  const applyTitle = (gi: number, t: string) => { up((p) => { p[gi].group = t; return p; }); setAiFor(null); };
 
   const effHistory = useMemo(() => ({ ...history, ...overrides }), [overrides]);
   const refs = useMemo(() => references(y, m, effHistory), [y, m, effHistory]);
@@ -156,10 +172,25 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
                       {ii === 0 && (
                         <td className={`${cell} bg-ivory/50 align-top`} rowSpan={g.items.length}>
                           <input value={g.group} onChange={(e) => up((p) => { p[gi].group = e.target.value; return p; })} className="w-full bg-transparent text-sm font-semibold outline-none" />
-                          <div className="mt-1 flex gap-2 text-[11px]">
+                          <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
                             <button onClick={() => up((p) => { p[gi].items.push({ name: "", normal: "", event: "" }); return p; })} className="text-taupe hover:underline">+ 시술</button>
                             <button onClick={() => up((p) => { p.splice(gi, 1); return p; })} className="text-charcoal/40 hover:text-red-600">그룹삭제</button>
+                            <button onClick={() => (aiFor === gi ? setAiFor(null) : openAi(gi))} className="font-semibold text-taupe-deep hover:underline">✨ AI 타이틀</button>
                           </div>
+                          {aiFor === gi && (
+                            <div className="mt-2 rounded-md border border-taupe/30 bg-white p-2">
+                              <div className="flex gap-1">
+                                <input value={aiDesc} onChange={(e) => setAiDesc(e.target.value)} placeholder="이벤트 설명(선택)" className="min-w-0 flex-1 rounded border border-taupe/20 px-1.5 py-1 text-[11px] outline-none" />
+                                <button onClick={() => runAi(gi)} disabled={aiLoading} className="shrink-0 rounded bg-taupe px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50">{aiLoading ? "…" : "추천"}</button>
+                              </div>
+                              <div className="mt-1.5 flex flex-col gap-1">
+                                {aiTitles.map((t, ti) => (
+                                  <button key={ti} onClick={() => applyTitle(gi, t)} className="rounded bg-taupe/10 px-2 py-1 text-left text-[11px] text-charcoal hover:bg-taupe/20">{t}</button>
+                                ))}
+                              </div>
+                              {aiNote && <div className="mt-1 text-[10px] text-charcoal/45">{aiNote}</div>}
+                            </div>
+                          )}
                         </td>
                       )}
                       <td className={cell}><input value={it.name} placeholder="시술명 (구성·횟수)" onChange={(e) => up((p) => { p[gi].items[ii].name = e.target.value; return p; })} className="w-full bg-transparent text-sm outline-none" /></td>

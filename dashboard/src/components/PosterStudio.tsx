@@ -30,6 +30,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [themes, setThemes] = useState<Record<number, string>>({});
   const [plates, setPlates] = useState<Record<number, Plate>>({});
   const [sizeKey, setSizeKey] = useState<string>("portrait");
+  const [logoScale, setLogoScale] = useState(1);
+  const [panelScale, setPanelScale] = useState(1);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -126,6 +128,16 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
           </div>
         </div>
         <p className="mt-2 text-xs text-charcoal/55">💡 사이즈를 먼저 고르고, 각 포스터에 <b>배경</b>을 올리면 그 위에 타이틀·가격이 합성됩니다. 배경에 이미 타이틀이 있으면 “타이틀 숨김”을 켜세요.</p>
+        <div className="mt-2 flex flex-wrap gap-5 text-xs text-charcoal/70">
+          <label className="flex items-center gap-2">로고 크기
+            <input type="range" min={0.6} max={1.8} step={0.05} value={logoScale} onChange={(e) => setLogoScale(Number(e.target.value))} className="w-32 accent-taupe" />
+            <span className="w-9 tabular-nums">{Math.round(logoScale * 100)}%</span>
+          </label>
+          <label className="flex items-center gap-2">패널 크기
+            <input type="range" min={0.7} max={1.15} step={0.01} value={panelScale} onChange={(e) => setPanelScale(Number(e.target.value))} className="w-32 accent-taupe" />
+            <span className="w-9 tabular-nums">{Math.round(panelScale * 100)}%</span>
+          </label>
+        </div>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
@@ -137,7 +149,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
               <div style={previewWrap(size.w, size.h)}>
                 <div style={previewInner}>
                   <Poster group={g} themeKey={themeFor(gi)} sheet={data.sheet} width={size.w} height={size.h}
-                    bgUrl={plate?.url} photoBg={!plate ? themeBg(themeFor(gi)) : undefined} hideTitle={plate?.hideTitle} />
+                    bgUrl={plate?.url} photoBg={!plate ? themeBg(themeFor(gi)) : undefined} hideTitle={plate?.hideTitle}
+                    logoScale={logoScale} panelScale={panelScale} />
                 </div>
               </div>
 
@@ -170,7 +183,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       <div style={{ position: "fixed", left: -30000, top: 0, pointerEvents: "none" }} aria-hidden>
         {cap && (
           <Poster ref={captureRef} group={data.groups[cap.gi]} themeKey={themeFor(cap.gi)} sheet={data.sheet} width={size.w} height={size.h}
-            bgUrl={plates[cap.gi]?.url} photoBg={!plates[cap.gi] ? themeBg(themeFor(cap.gi)) : undefined} hideTitle={plates[cap.gi]?.hideTitle} />
+            bgUrl={plates[cap.gi]?.url} photoBg={!plates[cap.gi] ? themeBg(themeFor(cap.gi)) : undefined} hideTitle={plates[cap.gi]?.hideTitle}
+            logoScale={logoScale} panelScale={panelScale} />
         )}
       </div>
     </div>
