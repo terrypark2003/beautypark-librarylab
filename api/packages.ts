@@ -1,5 +1,6 @@
 // Vercel 서버리스: 이벤트 패키지(시술 조합) 추천. GEMINI 우선 → ANTHROPIC 폴백.
 // 입력 시술 풀 안에서만 조합. 출력: [{title, items:[시술명]}]
+import { costUsd } from "./_pricing";
 
 function buildPrompt(month: string, pool: string[], examples: string[], description: string): string {
   return `너는 대구 수성구 피부과 "뷰티파크의원 범어점"의 마케팅 기획자다.
@@ -40,7 +41,9 @@ function parseGroups(text: string): any[] {
 const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-flash-latest"];
 const CLAUDE_DEFAULT = "claude-haiku-4-5";
 
-async function callGemini(key: string, prompt: string, preferred?: string): Promise<{ text: string | null; err: string; model: string }> {
+type Call = { text: string | null; err: string; model: string; inTok: number; outTok: number };
+
+async function callGemini(key: string, prompt: string, preferred?: string): Promise<Call> {
   const models = Array.from(new Set([preferred, ...GEMINI_MODELS].filter(Boolean) as string[]));
   let err = "";
   for (const model of models) {
@@ -51,14 +54,14 @@ async function callGemini(key: string, prompt: string, preferred?: string): Prom
       if (!r.ok) { err = `${model} ${r.status}: ${(await r.text()).slice(0, 140)}`; continue; }
       const d = await r.json();
       const t = d?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (t) return { text: t, err: "", model };
+      if (t) return { text: t, err: "", model, inTok: d?.usageMetadata?.promptTokenCount || 0, outTok: d?.usageMetadata?.candidatesTokenCount || 0 };
       err = `${model}: no text`;
     } catch (e: any) { err = `${model}: ${e?.message || e}`; }
   }
-  return { text: null, err, model: "" };
+  return { text: null, err, model: "", inTok: 0, outTok: 0 };
 }
 
-async function callAnthropic(key: string, prompt: string, preferred?: string): Promise<{ text: string | null; err: string; model: string }> {
+async function callAnthropic(key: string, prompt: string, preferred?: string): Promise<Call> {
   const models = Array.from(new Set([preferred, CLAUDE_DEFAULT].filter(Boolean) as string[]));
   let err = "";
   for (const model of models) {
@@ -71,11 +74,11 @@ async function callAnthropic(key: string, prompt: string, preferred?: string): P
       if (!r.ok) { err = `${model} ${r.status}: ${(await r.text()).slice(0, 120)}`; continue; }
       const d = await r.json();
       const t = d?.content?.[0]?.text;
-      if (t) return { text: t, err: "", model };
+      if (t) return { text: t, err: "", model, inTok: d?.usage?.input_tokens || 0, outTok: d?.usage?.output_tokens || 0 };
       err = `${model}: no text`;
     } catch (e: any) { err = `${model}: ${e?.message || e}`; }
   }
-  return { text: null, err, model: "" };
+  return { text: null, err, model: "", inTok: 0, outTok: 0 };
 }
 
 export default async function handler(req: any, res: any) {
@@ -105,9 +108,10 @@ export default async function handler(req: any, res: any) {
 
   const prompt = buildPrompt(month, pool, examples, description);
   let text: string | null = null, via = "", usedModel = "", diag = "";
-  if (useG) { const g = await callGemini(gemini!, prompt, model); if (g.text) { text = g.text; via = "gemini"; usedModel = g.model; } else diag += `G(${g.err}) `; }
-  if (!text && useA) { const a = await callAnthropic(anthropic!, prompt, model); if (a.text) { text = a.text; via = "anthropic"; usedModel = a.model; } else diag += `A(${a.err})`; }
+  let inTok = 0, outTok = 0;
+  if (useG) { const g = await callGemini(gemini!, prompt, model); if (g.text) { text = g.text; via = "gemini"; usedModel = g.model; inTok = g.inTok; outTok = g.outTok; } else diag += `G(${g.err}) `; }
+  if (!text && useA) { const a = await callAnthropic(anthropic!, prompt, model); if (a.text) { text = a.text; via = "anthropic"; usedModel = a.model; inTok = a.inTok; outTok = a.outTok; } else diag += `A(${a.err})`; }
 
   if (!text) { res.status(200).json({ groups: [], note: `AI 실패: ${diag.slice(0, 200)}` }); return; }
-  res.status(200).json({ groups: parseGroups(text), via, model: usedModel });
+  res.status(200).json({ groups: parseGroups(text), via, model: usedModel, usage: { input: inTok, output: outTok }, cost: costUsd(usedModel, inTok, outTok) });
 }

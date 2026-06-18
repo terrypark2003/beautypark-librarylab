@@ -1,4 +1,11 @@
+import { addSpend } from "./cost";
+
 export interface TitleResult { titles: string[]; note?: string }
+
+// 서버가 돌려준 실제 호출 비용(USD)을 이번 달 누적에 반영
+function track(d: any) {
+  if (d && (d.via === "gemini" || d.via === "anthropic")) addSpend(typeof d.cost === "number" ? d.cost : 0);
+}
 
 // API가 실제로 응답한 모델 id → 사람이 읽기 좋은 이름
 function prettyModel(m?: string): string {
@@ -75,6 +82,7 @@ export async function suggestPackages(input: { month: string; treatments: string
     if (r.ok) {
       const d = await r.json();
       if (Array.isArray(d.groups) && d.groups.length) {
+        track(d);
         return { groups: d.groups, note: viaLabel(d.via, d.model) };
       }
       return { groups: pkgFallback(input), note: d.note || "오프라인 추천" };
@@ -95,6 +103,7 @@ export async function suggestTitles(input: { month: string; treatments: string[]
     if (r.ok) {
       const d = await r.json();
       if (Array.isArray(d.titles) && d.titles.length) {
+        track(d);
         return { titles: d.titles, note: viaLabel(d.via, d.model) };
       }
       return { titles: fallback(input), note: d.note || "오프라인 추천" };

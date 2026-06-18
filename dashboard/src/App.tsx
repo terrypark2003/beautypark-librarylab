@@ -4,6 +4,7 @@ import PlanningView from "./components/PlanningView";
 import PosterStudio from "./components/PosterStudio";
 import EventHub from "./components/EventHub";
 import { BrandPanel, ChannelsPanel, CalendarPanel, ChecklistPanel } from "./components/Panels";
+import CostMeter from "./components/CostMeter";
 
 const FLOW = [
   { id: "plan", label: "① 이벤트 기획", hint: "히스토리 참고" },
@@ -48,6 +49,7 @@ export default function App() {
           <div className="px-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-charcoal/35">참고자료</div>
           {REF.map((t) => <NavBtn key={t.id} {...t} />)}
         </nav>
+        <CostMeter />
       </aside>
 
       <main className="flex-1 overflow-x-hidden">
