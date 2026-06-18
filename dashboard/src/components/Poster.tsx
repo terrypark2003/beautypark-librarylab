@@ -2,6 +2,7 @@ import { forwardRef } from "react";
 import type { EventGroup } from "../lib/types";
 import { THEMES } from "../lib/themes";
 import { manwon, eventPrice, normalPrice, validItems, type Sticker } from "../lib/poster";
+import { STICKER_SVGS } from "../lib/stickerAssets";
 import { logoUrl, logoWhiteUrl } from "../lib/logo";
 
 const Spark = ({ cls }: { cls: string }) => (
@@ -156,12 +157,15 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
         <div className="foot">부가세 10% 별도 &nbsp;·&nbsp; 현금 / 카드 동일</div>
         <div className="vat">VAT 별도</div>
 
-        {stickers.map((s) => (
-          <div key={s.id} className={`sticker${s.badge ? " badge" : ""}`} data-drag={`s:${s.id}`}
-            style={{ left: `${s.x}%`, top: `${s.y}%`, fontSize: `${s.size}em`, transform: `translate(-50%,-50%) rotate(${s.rot}deg)` }}>
-            {s.char}
-          </div>
-        ))}
+        {stickers.map((s) => {
+          const svg = s.char.startsWith("svg:") ? STICKER_SVGS[s.char.slice(4)] : null;
+          return (
+            <div key={s.id} className={`sticker${s.badge ? " badge" : ""}`} data-drag={`s:${s.id}`}
+              style={{ left: `${s.x}%`, top: `${s.y}%`, fontSize: `${s.size}em`, transform: `translate(-50%,-50%) rotate(${s.rot}deg)` }}>
+              {svg ? <span style={{ display: "block", width: "1em", height: "1em" }} dangerouslySetInnerHTML={{ __html: svg }} /> : s.char}
+            </div>
+          );
+        })}
       </div>
     );
   }

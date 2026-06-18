@@ -8,7 +8,17 @@ import { THEMES, THEME_LIST, themeKeyForGroup } from "../lib/themes";
 import { themeBg } from "../lib/backgrounds";
 import type { Sticker } from "../lib/poster";
 import { searchStock, stockToDataUrl, type StockPhoto } from "../lib/stock";
+import { STICKER_SVGS, SVG_KEYS } from "../lib/stickerAssets";
 import { Poster } from "./Poster";
+
+const THEME_QUERY: Record<string, string> = {
+  summer: "summer pastel aesthetic soft background",
+  cool: "water bubbles blue minimal background",
+  green: "green leaves botanical soft background",
+  luxe: "dark luxury velvet gold background",
+  sky: "blue summer sky clouds soft",
+  board: "beige paper texture minimal background",
+};
 
 const STICKERS = ["✦", "✧", "★", "❀", "✿", "❤", "☀", "✨", "🌸", "🍑", "🌿", "💧"];
 const BADGES = ["EVENT", "NEW", "HOT", "1+1", "BEST", "한정"];
@@ -125,10 +135,18 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const onDragEnd = () => { dragRef.current = null; };
 
   const addSticker = (gi: number, char: string, badge = false) => {
-    const s: Sticker = { id: uid(), char, x: 50, y: 38, size: badge ? 1.5 : 2.6, rot: 0, badge };
+    const size = char.startsWith("svg:") ? 4 : badge ? 1.5 : 2.6;
+    const s: Sticker = { id: uid(), char, x: 50, y: 40, size, rot: 0, badge };
     setStickers((m) => ({ ...m, [gi]: [...(m[gi] || []), s] }));
     setSelSticker({ gi, id: s.id });
   };
+  async function applyThemePhoto(gi: number) {
+    const res = await searchStock(THEME_QUERY[themeFor(gi)] || "aesthetic minimal background", size.w > size.h ? "landscape" : "portrait");
+    const ph = res.results[0];
+    if (!ph) { setError(res.note ? `테마사진: ${res.note}` : "테마 사진을 찾지 못했습니다"); return; }
+    try { const data = await stockToDataUrl(ph.url); setPlates((m) => ({ ...m, [gi]: { url: data, hideTitle: false } })); }
+    catch (e) { setError(`테마사진 적용 실패: ${(e as Error).message}`); }
+  }
   const updSticker = (gi: number, id: string, patch: Partial<Sticker>) =>
     setStickers((m) => ({ ...m, [gi]: (m[gi] || []).map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
   const delSticker = (gi: number, id: string) => {
@@ -288,7 +306,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   {plate ? "배경 변경" : "배경 업로드"}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => onPlate(gi, e.target.files?.[0])} />
                 </label>
-                <button onClick={() => { setStockGi(gi); setStockResults([]); setStockNote(undefined); }} className="rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-taupe-deep hover:bg-taupe/10">🔍 사진</button>
+                <button onClick={() => { setStockGi(gi); setStockResults([]); setStockNote(undefined); }} className="rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-taupe-deep hover:bg-taupe/10">🔍사진</button>
+                <button onClick={() => applyThemePhoto(gi)} className="rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-taupe-deep hover:bg-taupe/10">🎨테마</button>
                 {plate && <button onClick={() => removePlate(gi)} className="rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-charcoal/60 hover:bg-taupe/10">제거</button>}
                 <button onClick={() => setOpenOpts((m) => ({ ...m, [gi]: !m[gi] }))} className={`rounded-md border px-2 py-1.5 text-xs ${openOpts[gi] ? "border-taupe bg-taupe text-white" : "border-taupe/40 text-taupe-deep hover:bg-taupe/10"}`}>⚙</button>
               </div>
@@ -320,6 +339,13 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                     <div className="flex flex-wrap gap-1">
                       {STICKERS.map((c) => <button key={c} onClick={() => addSticker(gi, c)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-sm leading-none hover:bg-taupe/10">{c}</button>)}
                       {BADGES.map((c) => <button key={c} onClick={() => addSticker(gi, c, true)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] font-bold hover:bg-taupe/10">{c}</button>)}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {SVG_KEYS.map((k) => (
+                        <button key={k} onClick={() => addSticker(gi, `svg:${k}`)} title={k} className="rounded border border-taupe/30 p-1 hover:bg-taupe/10">
+                          <span style={{ fontSize: 20, lineHeight: 0, display: "block" }} dangerouslySetInnerHTML={{ __html: STICKER_SVGS[k] }} />
+                        </button>
+                      ))}
                     </div>
                     {selSticker?.gi === gi && (() => {
                       const st = (stickers[gi] || []).find((s) => s.id === selSticker!.id);
