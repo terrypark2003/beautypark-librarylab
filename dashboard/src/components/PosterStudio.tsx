@@ -6,7 +6,13 @@ import { sampleData } from "../lib/sample";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
 import { THEMES, THEME_LIST, themeKeyForGroup } from "../lib/themes";
 import { themeBg } from "../lib/backgrounds";
+import type { Sticker } from "../lib/poster";
 import { Poster } from "./Poster";
+
+const STICKERS = ["✦", "✧", "★", "❀", "✿", "❤", "☀", "✨", "🌸", "🍑", "🌿", "💧"];
+const BADGES = ["EVENT", "NEW", "HOT", "1+1", "BEST", "한정"];
+const uid = () => Math.random().toString(36).slice(2, 9);
+const clamp = (v: number) => Math.max(-10, Math.min(110, v));
 
 const sanitize = (s: string) => s.replace(/[\\/:*?"<>|\n]/g, "").replace(/\s+/g, "").slice(0, 36);
 type Plate = { url: string; hideTitle: boolean };
@@ -54,6 +60,10 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [scripts, setScripts] = useState<Record<number, string>>({});
   const [opts, setOpts] = useState<Record<number, Opts>>({});
   const [openOpts, setOpenOpts] = useState<Record<number, boolean>>({});
+  const [offsets, setOffsets] = useState<Record<number, { dx: number; dy: number }>>({});
+  const [stickers, setStickers] = useState<Record<number, Sticker[]>>({});
+  const [selSticker, setSelSticker] = useState<{ gi: number; id: string } | null>(null);
+  const dragRef = useRef<{ gi: number; tag: string; sx: number; sy: number; scale: number; base: any } | null>(null);
   const [sizeKey, setSizeKey] = useState<string>("portrait");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -71,7 +81,54 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const O = (gi: number): Opts => ({ ...DEFAULT_OPTS, ...(opts[gi] || {}) });
   const setO = (gi: number, patch: Partial<Opts>) => setOpts((m) => ({ ...m, [gi]: { ...DEFAULT_OPTS, ...(m[gi] || {}), ...patch } }));
 
-  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); }, [data]);
+  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setOffsets({}); setStickers({}); setSelSticker(null); }, [data]);
+
+  // 마우스 드래그(패널 이동 / 스티커 이동)
+  function onDragStart(gi: number, e: React.PointerEvent) {
+    const el = (e.target as HTMLElement).closest("[data-drag]") as HTMLElement | null;
+    if (!el) return;
+    const tag = el.getAttribute("data-drag")!;
+    const scale = PREVIEW_W / size.w;
+    if (tag.startsWith("s:")) {
+      const id = tag.slice(2);
+      const st = (stickers[gi] || []).find((s) => s.id === id);
+      if (!st) return;
+      dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { x: st.x, y: st.y } };
+      setSelSticker({ gi, id });
+    } else {
+      dragRef.current = { gi, tag: "panel", sx: e.clientX, sy: e.clientY, scale, base: offsets[gi] || { dx: 0, dy: 0 } };
+    }
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+  function onDragMove(e: React.PointerEvent) {
+    const d = dragRef.current;
+    if (!d) return;
+    const dxp = (e.clientX - d.sx) / d.scale;
+    const dyp = (e.clientY - d.sy) / d.scale;
+    if (d.tag === "panel") {
+      setOffsets((m) => ({ ...m, [d.gi]: { dx: d.base.dx + dxp, dy: d.base.dy + dyp } }));
+    } else {
+      const id = d.tag.slice(2);
+      const x = clamp(d.base.x + (dxp / size.w) * 100);
+      const y = clamp(d.base.y + (dyp / size.h) * 100);
+      setStickers((m) => ({ ...m, [d.gi]: (m[d.gi] || []).map((s) => (s.id === id ? { ...s, x, y } : s)) }));
+    }
+  }
+  const onDragEnd = () => { dragRef.current = null; };
+
+  const addSticker = (gi: number, char: string, badge = false) => {
+    const s: Sticker = { id: uid(), char, x: 50, y: 38, size: badge ? 1.5 : 2.6, rot: 0, badge };
+    setStickers((m) => ({ ...m, [gi]: [...(m[gi] || []), s] }));
+    setSelSticker({ gi, id: s.id });
+  };
+  const updSticker = (gi: number, id: string, patch: Partial<Sticker>) =>
+    setStickers((m) => ({ ...m, [gi]: (m[gi] || []).map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
+  const delSticker = (gi: number, id: string) => {
+    setStickers((m) => ({ ...m, [gi]: (m[gi] || []).filter((s) => s.id !== id) }));
+    setSelSticker(null);
+  };
+  const resetPanel = (gi: number) => setOffsets((m) => ({ ...m, [gi]: { dx: 0, dy: 0 } }));
   useEffect(() => { if (initialData) { setData(initialData); setSource(`기획 · ${initialData.sheet}`); } }, [initialData]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -145,6 +202,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       logoScale: o.logoScale, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount,
+      panelDx: offsets[gi]?.dx || 0, panelDy: offsets[gi]?.dy || 0, stickers: stickers[gi] || [],
     };
   };
 
@@ -180,7 +238,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
           const o = O(gi);
           return (
             <div key={gi} className="flex flex-col items-center gap-2.5">
-              <div style={previewWrap(size.w, size.h)}>
+              <div style={{ ...previewWrap(size.w, size.h), touchAction: "none", cursor: "grab" }}
+                onPointerDown={(e) => onDragStart(gi, e)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}>
                 <div style={previewInner}><Poster {...posterProps(gi)} /></div>
               </div>
 
@@ -231,6 +290,25 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                       <input value={o.headerTarget} onChange={(e) => setO(gi, { headerTarget: e.target.value })} placeholder="대상" className="w-full rounded border border-taupe/30 px-2 py-1" />
                     </div>
                   )}
+                  <div className="border-t border-taupe/15 pt-2">
+                    <div className="mb-1 flex items-center justify-between"><span className="font-medium">스티커</span><button onClick={() => resetPanel(gi)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] hover:bg-taupe/10">패널 위치 초기화</button></div>
+                    <div className="flex flex-wrap gap-1">
+                      {STICKERS.map((c) => <button key={c} onClick={() => addSticker(gi, c)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-sm leading-none hover:bg-taupe/10">{c}</button>)}
+                      {BADGES.map((c) => <button key={c} onClick={() => addSticker(gi, c, true)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] font-bold hover:bg-taupe/10">{c}</button>)}
+                    </div>
+                    {selSticker?.gi === gi && (() => {
+                      const st = (stickers[gi] || []).find((s) => s.id === selSticker!.id);
+                      if (!st) return null;
+                      return (
+                        <div className="mt-2 space-y-1 rounded bg-white p-2">
+                          <div className="flex items-center justify-between"><span>선택: <b>{st.char}</b></span><button onClick={() => delSticker(gi, st.id)} className="text-red-600 hover:underline">삭제</button></div>
+                          <label className="flex items-center gap-2">크기<input type="range" min={0.6} max={9} step={0.1} value={st.size} onChange={(e) => updSticker(gi, st.id, { size: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
+                          <label className="flex items-center gap-2">회전<input type="range" min={-60} max={60} step={1} value={st.rot} onChange={(e) => updSticker(gi, st.id, { rot: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
+                        </div>
+                      );
+                    })()}
+                    <div className="mt-1 text-[10px] text-charcoal/40">💡 미리보기에서 패널·스티커를 마우스로 끌어 옮기세요.</div>
+                  </div>
                 </div>
               )}
             </div>

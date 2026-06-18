@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 import type { EventGroup } from "../lib/types";
 import { THEMES } from "../lib/themes";
-import { manwon, eventPrice, normalPrice, validItems } from "../lib/poster";
+import { manwon, eventPrice, normalPrice, validItems, type Sticker } from "../lib/poster";
 import { logoUrl, logoWhiteUrl } from "../lib/logo";
 
 const Spark = ({ cls }: { cls: string }) => (
@@ -30,6 +30,9 @@ interface Props {
   headerPeriod?: string;
   headerTarget?: string;
   showDiscount?: boolean; // 할인율 % 배지
+  panelDx?: number; // 패널 가로 이동(px, 마우스 드래그)
+  panelDy?: number; // 패널 세로 이동(px)
+  stickers?: Sticker[]; // 장식 스티커
 }
 
 const ALIGN: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
@@ -45,7 +48,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, panelDx = 0, panelDy = 0, stickers = [] }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const t = theme.tokens;
     const h = theme.headline(group);
@@ -124,7 +127,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
               </div>
             </div>
           )}
-          <div className="panel">
+          <div className="panel" data-drag="panel" style={panelDx || panelDy ? { transform: `translate(${panelDx}px, ${panelDy}px)` } : undefined}>
             {showHeader && (headerPeriod || headerTarget) && (
               <div className="phead">
                 {[headerPeriod && `이벤트 기간 : ${headerPeriod}`, headerTarget && `이벤트 대상 : ${headerTarget}`].filter(Boolean).join("   |   ")}
@@ -152,6 +155,13 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
 
         <div className="foot">부가세 10% 별도 &nbsp;·&nbsp; 현금 / 카드 동일</div>
         <div className="vat">VAT 별도</div>
+
+        {stickers.map((s) => (
+          <div key={s.id} className={`sticker${s.badge ? " badge" : ""}`} data-drag={`s:${s.id}`}
+            style={{ left: `${s.x}%`, top: `${s.y}%`, fontSize: `${s.size}em`, transform: `translate(-50%,-50%) rotate(${s.rot}deg)` }}>
+            {s.char}
+          </div>
+        ))}
       </div>
     );
   }

@@ -76,6 +76,11 @@
 .poster.has-photo .foot { color: #fff; text-shadow: 0 .06em .3em rgba(0,0,0,.5); }
 .poster.has-photo .vat { border-color: rgba(255,255,255,.67); color: #fff; }
 
+/* 스티커 */
+.poster .sticker { position: absolute; z-index: 6; line-height: 1; white-space: nowrap; user-select: none; cursor: grab; filter: drop-shadow(0 .08em .25em rgba(0,0,0,.18)); }
+.poster .sticker.badge { font-family: "Pretendard Variable", Pretendard, sans-serif; font-weight: 800; color: #fff; background: var(--accent-deep); padding: .22em .6em; border-radius: 1em; letter-spacing: .02em; }
+.poster .panel[data-drag] { cursor: grab; }
+
 /* ===== 레이아웃 변형 ===== */
 /* center: 타이틀 가운데 정렬 + 패널 약간 좁게 */
 .poster.v-center .head { text-align: center; align-items: center; }
