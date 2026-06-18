@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import type { RequestData } from "../lib/types";
 import { references, latest, nextMonth, key, label, history, type HMonth } from "../lib/history";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
-import { suggestTitles } from "../lib/ai";
+import { suggestTitles, suggestPackages, type PackageGroup } from "../lib/ai";
 
 interface PItem { name: string; normal: string; event: string }
 interface PGroup { group: string; items: PItem[] }
@@ -46,8 +46,36 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
   }
   const applyTitle = (gi: number, t: string) => { up((p) => { p[gi].group = t; return p; }); setAiFor(null); };
 
+  // AI 패키지(시술 조합) 추천 상태
+  const [pkgOpen, setPkgOpen] = useState(false);
+  const [pkgDesc, setPkgDesc] = useState("");
+  const [pkgGroups, setPkgGroups] = useState<PackageGroup[]>([]);
+  const [pkgNote, setPkgNote] = useState<string | undefined>();
+  const [pkgLoading, setPkgLoading] = useState(false);
+
   const effHistory = useMemo(() => ({ ...history, ...overrides }), [overrides]);
   const refs = useMemo(() => references(y, m, effHistory), [y, m, effHistory]);
+
+  const priceMap = useMemo(() => {
+    const map: Record<string, { normal: number | null; event: number | null }> = {};
+    for (const hm of Object.values(effHistory))
+      for (const g of hm.groups) for (const it of g.items) if (it.name) map[it.name.trim()] = { normal: it.normal, event: it.event };
+    return map;
+  }, [effHistory]);
+
+  async function runPkg() {
+    setPkgLoading(true);
+    const pool = Array.from(new Set(Object.values(effHistory).flatMap((hm) => hm.groups.flatMap((g) => g.items.map((i) => i.name.trim()))))).filter(Boolean);
+    const examples = Array.from(new Set(Object.values(effHistory).flatMap((hm) => hm.groups.map((g) => g.group.trim())))).filter(Boolean).slice(0, 40);
+    const res = await suggestPackages({ month: key(y, m), treatments: pool, description: pkgDesc, examples });
+    setPkgGroups(res.groups); setPkgNote(res.note); setPkgLoading(false);
+  }
+  const toPGroup = (g: PackageGroup): PGroup => ({
+    group: g.title,
+    items: g.items.map((name) => { const p = priceMap[name.trim()]; return { name, normal: p?.normal != null ? String(p.normal) : "", event: p?.event != null ? String(p.event) : "" }; }),
+  });
+  const applyAllPkg = () => { setPlan(pkgGroups.map(toPGroup)); setPkgOpen(false); };
+  const addOnePkg = (g: PackageGroup) => up((p) => [...p, toPGroup(g)]);
   const up = (fn: (p: PGroup[]) => PGroup[]) => setPlan((p) => fn(structuredClone(p)));
 
   async function onOverride(e: React.ChangeEvent<HTMLInputElement>) {
@@ -143,12 +171,43 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
       <div className="rounded-xl border border-taupe/20 bg-white p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-serif text-lg text-taupe-deep">{y}년 {m}월 디자인 작업 요청서 · 이벤트 {plan.length} / 시술 {planItems}</h3>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setPkgOpen((o) => !o)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${pkgOpen ? "bg-taupe-deep text-white" : "border border-taupe-deep/40 text-taupe-deep hover:bg-taupe/10"}`}>✨ AI 패키지 추천</button>
             <button onClick={() => up((p) => [...p, { group: "새 이벤트", items: [{ name: "", normal: "", event: "" }] }])} className="rounded-md border border-taupe/40 px-3 py-1.5 text-xs font-semibold text-taupe-deep hover:bg-taupe/10">+ 이벤트</button>
             <button onClick={() => { setPlan([]); }} className="rounded-md border border-taupe/30 px-3 py-1.5 text-xs text-charcoal/60 hover:bg-taupe/10">비우기</button>
             <button onClick={generate} disabled={!planItems} className="rounded-md bg-taupe px-4 py-1.5 text-xs font-semibold text-white hover:bg-taupe-deep disabled:opacity-40">디자인 생성으로 보내기 →</button>
           </div>
         </div>
+
+        {pkgOpen && (
+          <div className="mb-4 rounded-lg border border-taupe-deep/25 bg-ivory/70 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-taupe-deep">✨ AI 패키지 추천</span>
+              <input value={pkgDesc} onChange={(e) => setPkgDesc(e.target.value)} placeholder="원하는 방향(선택): 예) 휴가 후 미백·진정 위주, 평일 화수목 포함" className="min-w-[240px] flex-1 rounded-md border border-taupe/30 px-2.5 py-1.5 text-sm" />
+              <button onClick={runPkg} disabled={pkgLoading} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep disabled:opacity-50">{pkgLoading ? "구상 중…" : "추천받기"}</button>
+              {pkgGroups.length > 0 && <button onClick={applyAllPkg} className="rounded-md border border-taupe-deep/50 px-3 py-1.5 text-sm font-semibold text-taupe-deep hover:bg-taupe/10">이 구성으로 기획표 채우기 ↧</button>}
+            </div>
+            {pkgNote && <div className="mt-1 text-[11px] text-charcoal/45">{pkgNote}</div>}
+            {pkgGroups.length > 0 && (
+              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {pkgGroups.map((g, gi) => (
+                  <div key={gi} className="rounded-lg border border-taupe/20 bg-white p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-semibold text-charcoal">{g.title}</div>
+                      <button onClick={() => addOnePkg(g)} className="shrink-0 rounded border border-taupe/40 px-1.5 py-0.5 text-[11px] text-taupe-deep hover:bg-taupe/10">+ 추가</button>
+                    </div>
+                    {(g.concept || g.target || g.intensity) && (
+                      <div className="mt-0.5 text-[11px] text-charcoal/55">{[g.concept, g.target && `타겟: ${g.target}`, g.intensity && `강도: ${g.intensity}`].filter(Boolean).join(" · ")}</div>
+                    )}
+                    <ul className="mt-1.5 space-y-0.5">
+                      {g.items.map((it, ii) => <li key={ii} className="text-[12px] text-charcoal/80">• {it}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {plan.length === 0 ? (
           <p className="rounded-md bg-ivory p-4 text-center text-sm text-charcoal/50">과거 참고에서 “불러오기”로 시작하거나 “+ 이벤트”로 직접 구성하세요.</p>

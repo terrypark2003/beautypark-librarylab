@@ -31,6 +31,46 @@ function fallback(input: { month: string; treatments: string[]; examples?: strin
   return Array.from(new Set(out)).slice(0, 6);
 }
 
+export interface PackageGroup { title: string; concept?: string; target?: string; intensity?: string; items: string[] }
+export interface PackageResult { groups: PackageGroup[]; note?: string }
+
+function pickByCat(pool: string[], re: RegExp, n = 4): string[] {
+  return pool.filter((t) => re.test(t)).slice(0, n);
+}
+function pkgFallback(input: { month: string; treatments: string[] }): PackageGroup[] {
+  const m = Number(input.month.split(".")[1] || "0");
+  const s = SEASON[m] || "이달의";
+  const pool = input.treatments;
+  const defs: [string, string, RegExp][] = [
+    [`${s} 미백 리셋`, "자외선 후 색소·톤", /토닝|엑셀V|미백|비타민|피코/],
+    ["모공·피지 집중", "늘어난 모공·피지", /모공|버츄|아쿠아필|프락셀|LDM/],
+    ["텐션 리프팅", "처진 탄력 케어", /슈링크|인모드|올타이트|소프웨이브|리프|울쎄|포텐자/],
+    ["물광·재생", "속건조·생기", /리쥬란|물광|쥬베룩|스킨부스터|줄기세포|엑소좀/],
+    ["바디 케어", "바디라인 마무리", /바디|제모|리포|윤곽|승모근/],
+  ];
+  return defs
+    .map(([title, concept, re]) => ({ title, concept, items: pickByCat(pool, re) }))
+    .filter((g) => g.items.length)
+    .slice(0, 6);
+}
+
+export async function suggestPackages(input: { month: string; treatments: string[]; description?: string; examples?: string[] }): Promise<PackageResult> {
+  try {
+    const r = await fetch("/api/packages", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+    if (r.ok) {
+      const d = await r.json();
+      if (Array.isArray(d.groups) && d.groups.length) {
+        const label = d.via === "gemini" ? "Gemini 추천 ✨" : d.via === "anthropic" ? "Claude 추천 ✨" : undefined;
+        return { groups: d.groups, note: label };
+      }
+      return { groups: pkgFallback(input), note: d.note || "오프라인 추천" };
+    }
+  } catch {
+    /* 폴백 */
+  }
+  return { groups: pkgFallback(input), note: "오프라인 추천 (AI 서버 미연결)" };
+}
+
 export async function suggestTitles(input: { month: string; treatments: string[]; description?: string; examples?: string[] }): Promise<TitleResult> {
   try {
     const r = await fetch("/api/title", {
