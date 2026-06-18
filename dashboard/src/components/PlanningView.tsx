@@ -36,12 +36,13 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
   const [aiTitles, setAiTitles] = useState<string[]>([]);
   const [aiNote, setAiNote] = useState<string | undefined>();
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiEngine, setAiEngine] = useState<"auto" | "gemini" | "claude">("auto");
 
   const openAi = (gi: number) => { setAiFor(gi); setAiTitles([]); setAiDesc(""); setAiNote(undefined); };
   async function runAi(gi: number) {
     setAiLoading(true);
     const examples = Array.from(new Set(Object.values(effHistory).flatMap((hm) => hm.groups.map((g) => g.group.trim())))).filter(Boolean).slice(0, 40);
-    const res = await suggestTitles({ month: key(y, m), treatments: plan[gi].items.map((i) => i.name).filter(Boolean), description: aiDesc, examples });
+    const res = await suggestTitles({ month: key(y, m), treatments: plan[gi].items.map((i) => i.name).filter(Boolean), description: aiDesc, examples, provider: aiEngine });
     setAiTitles(res.titles); setAiNote(res.note); setAiLoading(false);
   }
   const applyTitle = (gi: number, t: string) => { up((p) => { p[gi].group = t; return p; }); setAiFor(null); };
@@ -67,7 +68,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
     setPkgLoading(true);
     const pool = Array.from(new Set(Object.values(effHistory).flatMap((hm) => hm.groups.flatMap((g) => g.items.map((i) => i.name.trim()))))).filter(Boolean);
     const examples = Array.from(new Set(Object.values(effHistory).flatMap((hm) => hm.groups.map((g) => g.group.trim())))).filter(Boolean).slice(0, 40);
-    const res = await suggestPackages({ month: key(y, m), treatments: pool, description: pkgDesc, examples });
+    const res = await suggestPackages({ month: key(y, m), treatments: pool, description: pkgDesc, examples, provider: aiEngine });
     setPkgGroups(res.groups); setPkgNote(res.note); setPkgLoading(false);
   }
   const toPGroup = (g: PackageGroup): PGroup => ({
@@ -183,7 +184,10 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
           <div className="mb-4 rounded-lg border border-taupe-deep/25 bg-ivory/70 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-taupe-deep">✨ AI 패키지 추천</span>
-              <input value={pkgDesc} onChange={(e) => setPkgDesc(e.target.value)} placeholder="원하는 방향(선택): 예) 휴가 후 미백·진정 위주, 평일 화수목 포함" className="min-w-[240px] flex-1 rounded-md border border-taupe/30 px-2.5 py-1.5 text-sm" />
+              <input value={pkgDesc} onChange={(e) => setPkgDesc(e.target.value)} placeholder="원하는 방향(선택): 예) 휴가 후 미백·진정 위주, 평일 화수목 포함" className="min-w-[200px] flex-1 rounded-md border border-taupe/30 px-2.5 py-1.5 text-sm" />
+              <select value={aiEngine} onChange={(e) => setAiEngine(e.target.value as any)} title="AI 엔진" className="rounded-md border border-taupe/30 bg-white px-2 py-1.5 text-sm">
+                <option value="auto">자동</option><option value="gemini">Gemini</option><option value="claude">Claude</option>
+              </select>
               <button onClick={runPkg} disabled={pkgLoading} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep disabled:opacity-50">{pkgLoading ? "구상 중…" : "추천받기"}</button>
               {pkgGroups.length > 0 && <button onClick={applyAllPkg} className="rounded-md border border-taupe-deep/50 px-3 py-1.5 text-sm font-semibold text-taupe-deep hover:bg-taupe/10">이 구성으로 기획표 채우기 ↧</button>}
             </div>
@@ -241,6 +245,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
                             <div className="mt-2 rounded-md border border-taupe/30 bg-white p-2">
                               <div className="flex gap-1">
                                 <input value={aiDesc} onChange={(e) => setAiDesc(e.target.value)} placeholder="이벤트 설명(선택)" className="min-w-0 flex-1 rounded border border-taupe/20 px-1.5 py-1 text-[11px] outline-none" />
+                                <select value={aiEngine} onChange={(e) => setAiEngine(e.target.value as any)} title="AI 엔진" className="shrink-0 rounded border border-taupe/20 px-1 py-1 text-[10px]"><option value="auto">자동</option><option value="gemini">Gem</option><option value="claude">Claude</option></select>
                                 <button onClick={() => runAi(gi)} disabled={aiLoading} className="shrink-0 rounded bg-taupe px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50">{aiLoading ? "…" : "추천"}</button>
                               </div>
                               <div className="mt-1.5 flex flex-col gap-1">

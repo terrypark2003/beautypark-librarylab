@@ -54,7 +54,7 @@ function pkgFallback(input: { month: string; treatments: string[] }): PackageGro
     .slice(0, 6);
 }
 
-export async function suggestPackages(input: { month: string; treatments: string[]; description?: string; examples?: string[] }): Promise<PackageResult> {
+export async function suggestPackages(input: { month: string; treatments: string[]; description?: string; examples?: string[]; provider?: string }): Promise<PackageResult> {
   try {
     const r = await fetch("/api/packages", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
     if (r.ok) {
@@ -71,7 +71,7 @@ export async function suggestPackages(input: { month: string; treatments: string
   return { groups: pkgFallback(input), note: "오프라인 추천 (AI 서버 미연결)" };
 }
 
-export async function suggestTitles(input: { month: string; treatments: string[]; description?: string; examples?: string[] }): Promise<TitleResult> {
+export async function suggestTitles(input: { month: string; treatments: string[]; description?: string; examples?: string[]; provider?: string }): Promise<TitleResult> {
   try {
     const r = await fetch("/api/title", {
       method: "POST",

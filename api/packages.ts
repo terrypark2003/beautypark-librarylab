@@ -74,19 +74,26 @@ export default async function handler(req: any, res: any) {
   if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
   const gemini = process.env.GEMINI_API_KEY;
   const anthropic = process.env.ANTHROPIC_API_KEY;
-  if (!gemini && !anthropic) { res.status(200).json({ groups: [], note: "API 키 미설정" }); return; }
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
+  const provider = body?.provider || "auto";
   const month: string = body?.month || "";
   const pool: string[] = Array.isArray(body?.treatments) ? body.treatments.filter((t: any) => typeof t === "string") : [];
   const examples: string[] = Array.isArray(body?.examples) ? body.examples.filter((e: any) => typeof e === "string") : [];
   const description: string = body?.description || "";
-  const prompt = buildPrompt(month, pool, examples, description);
 
+  const useG = (provider === "auto" || provider === "gemini") && gemini;
+  const useA = (provider === "auto" || provider === "claude") && anthropic;
+  if (!useG && !useA) {
+    res.status(200).json({ groups: [], note: provider === "claude" ? "ANTHROPIC_API_KEY 미설정" : provider === "gemini" ? "GEMINI_API_KEY 미설정" : "API 키 미설정" });
+    return;
+  }
+
+  const prompt = buildPrompt(month, pool, examples, description);
   let text: string | null = null, via = "", diag = "";
-  if (gemini) { const g = await callGemini(gemini, prompt); if (g.text) { text = g.text; via = "gemini"; } else diag += `G(${g.err}) `; }
-  if (!text && anthropic) { const a = await callAnthropic(anthropic, prompt); if (a.text) { text = a.text; via = "anthropic"; } else diag += `A(${a.err})`; }
+  if (useG) { const g = await callGemini(gemini!, prompt); if (g.text) { text = g.text; via = "gemini"; } else diag += `G(${g.err}) `; }
+  if (!text && useA) { const a = await callAnthropic(anthropic!, prompt); if (a.text) { text = a.text; via = "anthropic"; } else diag += `A(${a.err})`; }
 
   if (!text) { res.status(200).json({ groups: [], note: `AI 실패: ${diag.slice(0, 200)}` }); return; }
   res.status(200).json({ groups: parseGroups(text), via });
