@@ -1,5 +1,20 @@
 export interface TitleResult { titles: string[]; note?: string }
 
+// API가 실제로 응답한 모델 id → 사람이 읽기 좋은 이름
+function prettyModel(m?: string): string {
+  if (!m) return "";
+  const map: Record<string, string> = {
+    "gemini-2.0-flash": "Gemini 2.0 Flash", "gemini-2.5-flash": "Gemini 2.5 Flash", "gemini-2.5-pro": "Gemini 2.5 Pro",
+    "gemini-1.5-flash": "Gemini 1.5 Flash", "gemini-flash-latest": "Gemini Flash",
+    "claude-haiku-4-5": "Claude Haiku 4.5", "claude-sonnet-4-6": "Claude Sonnet 4.6", "claude-opus-4-8": "Claude Opus 4.8",
+  };
+  return map[m] || m;
+}
+function viaLabel(via?: string, model?: string): string | undefined {
+  const name = prettyModel(model) || (via === "gemini" ? "Gemini" : via === "anthropic" ? "Claude" : "");
+  return name ? `${name} 추천 ✨` : undefined;
+}
+
 const SEASON: Record<number, string> = {
   1: "새해 뷰티 리셋", 2: "봄 준비", 3: "봄 새단장", 4: "봄 글로우", 5: "가정의 달", 6: "초여름 싱그러움",
   7: "한여름 바캉스", 8: "늦여름 회복", 9: "환절기 케어", 10: "가을 광채", 11: "연말 준비", 12: "연말 결산",
@@ -54,14 +69,13 @@ function pkgFallback(input: { month: string; treatments: string[] }): PackageGro
     .slice(0, 6);
 }
 
-export async function suggestPackages(input: { month: string; treatments: string[]; description?: string; examples?: string[]; provider?: string }): Promise<PackageResult> {
+export async function suggestPackages(input: { month: string; treatments: string[]; description?: string; examples?: string[]; provider?: string; model?: string }): Promise<PackageResult> {
   try {
     const r = await fetch("/api/packages", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
     if (r.ok) {
       const d = await r.json();
       if (Array.isArray(d.groups) && d.groups.length) {
-        const label = d.via === "gemini" ? "Gemini 추천 ✨" : d.via === "anthropic" ? "Claude 추천 ✨" : undefined;
-        return { groups: d.groups, note: label };
+        return { groups: d.groups, note: viaLabel(d.via, d.model) };
       }
       return { groups: pkgFallback(input), note: d.note || "오프라인 추천" };
     }
@@ -71,7 +85,7 @@ export async function suggestPackages(input: { month: string; treatments: string
   return { groups: pkgFallback(input), note: "오프라인 추천 (AI 서버 미연결)" };
 }
 
-export async function suggestTitles(input: { month: string; treatments: string[]; description?: string; examples?: string[]; provider?: string }): Promise<TitleResult> {
+export async function suggestTitles(input: { month: string; treatments: string[]; description?: string; examples?: string[]; provider?: string; model?: string }): Promise<TitleResult> {
   try {
     const r = await fetch("/api/title", {
       method: "POST",
@@ -81,8 +95,7 @@ export async function suggestTitles(input: { month: string; treatments: string[]
     if (r.ok) {
       const d = await r.json();
       if (Array.isArray(d.titles) && d.titles.length) {
-        const label = d.via === "gemini" ? "Gemini 추천 ✨" : d.via === "anthropic" ? "Claude 추천 ✨" : undefined;
-        return { titles: d.titles, note: label };
+        return { titles: d.titles, note: viaLabel(d.via, d.model) };
       }
       return { titles: fallback(input), note: d.note || "오프라인 추천" };
     }
