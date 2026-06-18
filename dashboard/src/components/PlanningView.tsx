@@ -142,7 +142,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
       {/* 작업요청서 표 */}
       <div className="rounded-xl border border-taupe/20 bg-white p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-serif text-lg text-taupe-deep">{y}월 디자인 작업 요청서 · 이벤트 {plan.length} / 시술 {planItems}</h3>
+          <h3 className="font-serif text-lg text-taupe-deep">{y}년 {m}월 디자인 작업 요청서 · 이벤트 {plan.length} / 시술 {planItems}</h3>
           <div className="flex gap-2">
             <button onClick={() => up((p) => [...p, { group: "새 이벤트", items: [{ name: "", normal: "", event: "" }] }])} className="rounded-md border border-taupe/40 px-3 py-1.5 text-xs font-semibold text-taupe-deep hover:bg-taupe/10">+ 이벤트</button>
             <button onClick={() => { setPlan([]); }} className="rounded-md border border-taupe/30 px-3 py-1.5 text-xs text-charcoal/60 hover:bg-taupe/10">비우기</button>
