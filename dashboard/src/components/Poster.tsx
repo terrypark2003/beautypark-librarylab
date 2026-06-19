@@ -44,6 +44,10 @@ interface Props {
   brandFont?: "sans" | "serif"; // 우상단 폰트
   brandStyle?: "stack" | "line" | "hidden"; // 우상단 형식: 2줄 / 한줄 / 숨김
   titleFx?: string; // 타이틀 글자 효과: none|shadow|lift|3d|outline|glow
+  l1Override?: string; // 제목 1줄 직접 수정(더블클릭 편집)
+  l2Override?: string; // 제목 2줄 직접 수정
+  titleFont?: "sans" | "serif"; // 제목 폰트
+  titleScale?: number; // 제목 크기 배율
   panelDx?: number; // 패널 가로 이동(px, 마우스 드래그)
   panelDy?: number; // 패널 세로 이동(px)
   panelScale?: number; // 패널 크기 배율(가장자리 드래그)
@@ -70,7 +74,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", panelDx = 0, panelDy = 0, panelScale = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, stickers = [] }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, panelDx = 0, panelDy = 0, panelScale = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, stickers = [] }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -83,6 +87,9 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     const brandTopText = brandTop && brandTop.trim() ? brandTop : `EVENT · ${sheet}`;
     const brandSubText = brandSub !== undefined ? brandSub : "BEOMEO";
     const scriptText = scriptOverride !== undefined ? scriptOverride : h.script;
+    const L1 = l1Override !== undefined ? l1Override : h.l1;
+    const L2 = l2Override !== undefined ? l2Override : h.l2;
+    const titleFamily = titleFont === "serif" ? '"Playfair Display", serif' : '"Pretendard Variable", Pretendard, sans-serif';
     const isStudio = variant === "studio";
 
     const styleVars = {
@@ -97,6 +104,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
       ["--price-size" as any]: priceSize,
       ["--price-font" as any]: pf.family,
       ["--price-weight" as any]: pf.weight,
+      ["--title-scale" as any]: titleScale,
+      ["--title-font" as any]: titleFamily,
       ["--bg" as any]: t.bg,
       ["--blob" as any]: t.blob,
       ["--ink" as any]: t.ink,
@@ -153,9 +162,9 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
               {isStudio ? (
                 <>
                   <div className="hl-row">
-                    <span className="hl-l">{h.l1}</span>
+                    <span className="hl-l">{L1}</span>
                     <span className="hl-rule" />
-                    {h.l2 && <span className="hl-r">{h.l2}</span>}
+                    {L2 && <span className="hl-r">{L2}</span>}
                   </div>
                   {scriptText && <div className="script en">{scriptText}</div>}
                 </>
@@ -165,8 +174,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
                   {h.sup && <div className="sup">{h.sup}</div>}
                   {h.badge && <div className="badge">{h.badge}</div>}
                   <div className="title">
-                    {h.l1}
-                    {h.l2 && <span className="l2">{h.l2}</span>}
+                    {L1}
+                    {L2 && <span className="l2">{L2}</span>}
                   </div>
                 </>
               )}

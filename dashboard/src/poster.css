@@ -47,7 +47,7 @@
 .poster .script { font-family: "Pinyon Script", cursive; font-size: 2.4em; color: var(--script); line-height: .8; margin-bottom: .18em; }
 .poster .sup { font-size: .82em; font-weight: 600; color: var(--accent); letter-spacing: .03em; margin-bottom: .35em; }
 .poster .badge { display: inline-block; background: var(--accent-deep); color: #fff; font-weight: 800; font-size: .78em; letter-spacing: .06em; padding: .28em .82em; border-radius: 1em; margin-bottom: .5em; }
-.poster .title { font-weight: 800; font-size: 2.3em; line-height: 1.14; letter-spacing: -.01em; }
+.poster .title { font-weight: 800; font-family: var(--title-font, "Pretendard Variable", Pretendard, sans-serif); font-size: calc(2.3em * var(--title-scale, 1)); line-height: 1.14; letter-spacing: -.01em; }
 .poster .title .l2 { display: block; color: var(--accent-deep); }
 
 .poster .panel { position: relative; background: var(--panel); border-radius: 1.05em; box-shadow: 0 .7em 1.8em rgba(80,66,48,.13); display: flex; flex-direction: column; padding: .45em 0; margin-top: calc(var(--panel-top, 0) * 1em); margin-bottom: calc(var(--panel-bottom, 0) * 1em); }
@@ -100,11 +100,11 @@
 /* editorial: 큰 스크립트 + 작은 타이틀 + 좌측 액센트 바 */
 .poster.v-editorial .head { border-left: .22em solid var(--accent); padding-left: .7em; }
 .poster.v-editorial .script { font-size: 3.1em; }
-.poster.v-editorial .title { font-size: 1.85em; }
+.poster.v-editorial .title { font-size: calc(1.85em * var(--title-scale, 1)); }
 
 /* minimal: 스크립트 숨김, 타이틀 컴팩트, 패널 강조 */
 .poster.v-minimal .script { display: none; }
-.poster.v-minimal .title { font-size: 1.7em; font-weight: 700; }
+.poster.v-minimal .title { font-size: calc(1.7em * var(--title-scale, 1)); font-weight: 700; }
 .poster.v-minimal .body { gap: .7em; }
 
 /* ===== 타이틀 글자 효과 (그림자/3D/외곽선/글로우) — has-photo의 기본 그림자보다 우선 ===== */
@@ -120,14 +120,22 @@
 }
 .poster.has-photo.fx-outline .title, .poster.has-photo.fx-outline .title .l2, .poster.has-photo.fx-outline .script { -webkit-text-stroke-color: rgba(0,0,0,.55); }
 .poster.fx-glow .title, .poster.fx-glow .title .l2, .poster.fx-glow .script { text-shadow: 0 0 .18em var(--accent), 0 0 .4em var(--accent), 0 0 .75em var(--accent-deep) !important; }
+/* 고급 효과 */
+.poster.fx-gradient .title { background: linear-gradient(180deg, var(--accent) 0%, var(--accent-deep) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-shadow: none !important; }
+.poster.fx-gold .title { background: linear-gradient(180deg, #fcf2c4 0%, #e7c45e 46%, #b8860b 56%, #f6e6a6 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 .035em .04em rgba(0,0,0,.4)); text-shadow: none !important; }
+.poster.fx-longshadow .title, .poster.fx-longshadow .title .l2 {
+  text-shadow: .03em .03em 0 var(--accent-deep), .06em .06em 0 var(--accent-deep), .09em .09em 0 var(--accent-deep),
+    .12em .12em 0 var(--accent-deep), .15em .15em 0 var(--accent-deep), .18em .18em .04em rgba(0,0,0,.3) !important;
+}
+.poster.fx-emboss .title, .poster.fx-emboss .title .l2 { color: color-mix(in srgb, var(--ink) 80%, #fff) !important; -webkit-text-fill-color: currentColor; text-shadow: 0 .02em 0 rgba(255,255,255,.7), 0 -.015em .012em rgba(0,0,0,.4) !important; }
 
 /* ===== studio: 미니멀 에디토리얼 (좌우 분할 헤어라인 헤드라인 + 중앙 제품명 + 하단 로고) ===== */
 .poster.v-studio .top, .poster.v-studio .spk, .poster.v-studio .foot, .poster.v-studio .vat { display: none; }
 .poster.v-studio .body { padding: .4em 0 .2em; }
 .poster.v-studio .studio-head { width: 100%; }
 .poster.v-studio .hl-row { display: flex; align-items: flex-end; gap: .55em; width: 100%; }
-.poster.v-studio .hl-l { min-width: 0; word-break: keep-all; font-weight: 700; font-size: 1.55em; line-height: 1.05; letter-spacing: -.01em; }
-.poster.v-studio .hl-r { white-space: nowrap; font-weight: 700; font-size: 1.55em; line-height: 1.05; letter-spacing: -.01em; color: var(--accent-deep); }
+.poster.v-studio .hl-l { min-width: 0; word-break: keep-all; font-weight: 700; font-family: var(--title-font, "Pretendard Variable", Pretendard, sans-serif); font-size: calc(1.55em * var(--title-scale, 1)); line-height: 1.05; letter-spacing: -.01em; }
+.poster.v-studio .hl-r { white-space: nowrap; font-weight: 700; font-family: var(--title-font, "Pretendard Variable", Pretendard, sans-serif); font-size: calc(1.55em * var(--title-scale, 1)); line-height: 1.05; letter-spacing: -.01em; color: var(--accent-deep); }
 .poster.v-studio .hl-rule { flex: 1 0 .8em; height: 0; border-top: 1px solid currentColor; margin-bottom: .5em; opacity: .5; }
 .poster.v-studio .studio-head .script { font-size: 1.7em; margin-top: .3em; }
 /* 제품명: 흰 박스 제거 + 세로 중앙 + 가운데 정렬 */

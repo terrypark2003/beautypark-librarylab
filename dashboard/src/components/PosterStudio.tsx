@@ -53,13 +53,15 @@ interface Opts {
   brandSub: string; // 우상단 아랫줄
   brandFont: "sans" | "serif"; // 우상단 폰트
   brandStyle: "stack" | "line" | "hidden"; // 우상단 형식
-  titleFx: "none" | "shadow" | "lift" | "3d" | "outline" | "glow"; // 타이틀 글자 효과
+  titleFx: "none" | "shadow" | "lift" | "3d" | "outline" | "glow" | "gradient" | "gold" | "longshadow" | "emboss"; // 타이틀 글자 효과
+  titleFont: "sans" | "serif"; // 제목 폰트
+  titleScale: number; // 제목 크기 배율
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
   showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
-  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none",
+  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1,
 };
 
 const SIZES = [
@@ -83,6 +85,12 @@ const LAYOUTS = [
   { key: "studio", label: "미니멀 에디토리얼" },
 ] as const;
 
+const TITLE_FX: { v: Opts["titleFx"]; label: string }[] = [
+  { v: "none", label: "없음" }, { v: "shadow", label: "그림자" }, { v: "lift", label: "떠있는 그림자" },
+  { v: "3d", label: "3D 입체" }, { v: "longshadow", label: "롱 섀도우" }, { v: "outline", label: "외곽선" },
+  { v: "emboss", label: "음각/양각" }, { v: "glow", label: "네온 글로우" }, { v: "gradient", label: "그라데이션" }, { v: "gold", label: "골드 ✨" },
+];
+
 const PREVIEW_W = 330; // 세로형 미리보기 폭
 const PREVIEW_W_LAND = 760; // 가로형은 한 줄에 한 장씩 크게
 
@@ -101,6 +109,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [layouts, setLayouts] = useState<Record<number, Layout>>({});
   const [stickers, setStickers] = useState<Record<number, Sticker[]>>({});
   const [selSticker, setSelSticker] = useState<{ gi: number; id: string } | null>(null);
+  const [titleOv, setTitleOv] = useState<Record<number, { l1?: string; l2?: string }>>({});
+  const [titleEdit, setTitleEdit] = useState<number | null>(null); // 타이틀 편집 팝업 대상 gi
   const dragRef = useRef<{ gi: number; tag: string; sx: number; sy: number; scale: number; base: any } | null>(null);
   const [sizeKey, setSizeKey] = useState<string>("portrait");
   // 스톡 사진 검색
@@ -137,7 +147,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const O = (gi: number): Opts => ({ ...DEFAULT_OPTS, ...(opts[gi] || {}) });
   const setO = (gi: number, patch: Partial<Opts>) => setOpts((m) => ({ ...m, [gi]: { ...DEFAULT_OPTS, ...(m[gi] || {}), ...patch } }));
 
-  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setLayouts({}); setStickers({}); setSelSticker(null); }, [data]);
+  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setLayouts({}); setStickers({}); setSelSticker(null); setTitleOv({}); setTitleEdit(null); }, [data]);
   const L = (gi: number): Layout => ({ ...DEFAULT_LAYOUT, ...(layouts[gi] || {}) });
   const setL = (gi: number, patch: Partial<Layout>) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT, ...(m[gi] || {}), ...patch } }));
 
@@ -181,6 +191,12 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     }
   }
   const onDragEnd = () => { dragRef.current = null; };
+  // 타이틀(헤드라인) 더블클릭 → 편집 팝업
+  function onTitleDblClick(gi: number, e: React.MouseEvent) {
+    if ((e.target as HTMLElement).closest('[data-drag="head"]')) setTitleEdit(gi);
+  }
+  const titleDefault = (gi: number) => (THEMES[themeFor(gi)] || THEMES.summer).headline(data.groups[gi]);
+  const setTitleLine = (gi: number, key: "l1" | "l2", v: string) => setTitleOv((m) => ({ ...m, [gi]: { ...m[gi], [key]: v } }));
 
   const addSticker = (gi: number, char: string, badge = false) => {
     const size = char.startsWith("img:") ? 7 : char.startsWith("svg:") ? 4.5 : badge ? 1.5 : 2.6;
@@ -345,7 +361,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount, showPrice: o.showPrice,
       nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
-      brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle, titleFx: o.titleFx,
+      brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle,
+      titleFx: o.titleFx, titleFont: o.titleFont, titleScale: o.titleScale, l1Override: titleOv[gi]?.l1, l2Override: titleOv[gi]?.l2,
       panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScale: L(gi).panelScale,
       logoDx: L(gi).logo.dx, logoDy: L(gi).logo.dy, headDx: L(gi).head.dx, headDy: L(gi).head.dy,
       stickers: stickers[gi] || [],
@@ -394,7 +411,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
           return (
             <div key={gi} className="flex flex-col items-center gap-2.5">
               <div style={{ ...previewWrap(size.w, size.h), touchAction: "none", cursor: "grab" }}
-                onPointerDown={(e) => onDragStart(gi, e)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}>
+                onPointerDown={(e) => onDragStart(gi, e)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}
+                onDoubleClick={(e) => onTitleDblClick(gi, e)} title="타이틀을 더블클릭하면 글자·폰트·효과를 편집할 수 있어요">
                 <div style={previewInner}><Poster {...posterProps(gi)} /></div>
               </div>
 
@@ -463,12 +481,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   <div className="flex items-center gap-2 rounded border border-taupe/15 bg-white/60 p-2">
                     <span className="font-medium text-charcoal/60">타이틀 효과</span>
                     <select value={o.titleFx} onChange={(e) => setO(gi, { titleFx: e.target.value as Opts["titleFx"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
-                      <option value="none">없음</option>
-                      <option value="shadow">그림자</option>
-                      <option value="lift">떠있는 그림자</option>
-                      <option value="3d">3D 입체</option>
-                      <option value="outline">외곽선</option>
-                      <option value="glow">네온 글로우</option>
+                      {TITLE_FX.map((f) => <option key={f.v} value={f.v}>{f.label}</option>)}
                     </select>
                   </div>
 
@@ -539,7 +552,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                         </div>
                       );
                     })()}
-                    <div className="mt-1 text-[10px] text-charcoal/40">💡 미리보기에서 <b>로고·타이틀·패널·스티커</b>를 마우스로 끌어 옮기고, 패널 <b>아래 가장자리</b>를 위/아래로 끌면 크기가 바뀝니다.</div>
+                    <div className="mt-1 text-[10px] text-charcoal/40">💡 미리보기에서 <b>로고·타이틀·패널·스티커</b>를 마우스로 끌어 옮기고, 패널 <b>아래 가장자리</b>를 위/아래로 끌면 크기가 바뀝니다. <b>타이틀을 더블클릭</b>하면 글자·폰트·크기·효과를 바꿀 수 있어요.</div>
                   </div>
                 </div>
               )}
@@ -597,6 +610,59 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
           </div>
         </div>
       )}
+
+      {titleEdit !== null && (() => {
+        const gi = titleEdit;
+        const o = O(gi);
+        const def = titleDefault(gi);
+        const ov = titleOv[gi] || {};
+        const l1 = ov.l1 !== undefined ? ov.l1 : def.l1;
+        const l2 = ov.l2 !== undefined ? ov.l2 : (def.l2 || "");
+        return (
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setTitleEdit(null)}>
+            <div className="mt-16 w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-serif text-lg text-taupe-deep">타이틀 편집</h3>
+                <button onClick={() => setTitleEdit(null)} className="rounded-md border border-taupe/30 px-3 py-1 text-sm text-charcoal/70">닫기</button>
+              </div>
+              <div className="space-y-3 text-sm">
+                <label className="block">
+                  <span className="text-xs text-charcoal/55">윗줄 (영문 스크립트, 빈칸=숨김)</span>
+                  <input value={scriptFor(gi)} onChange={(e) => setScripts((m) => ({ ...m, [gi]: e.target.value }))} placeholder="예: Early Summer" className="mt-1 w-full rounded-md border border-taupe/30 px-2 py-1.5" />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-charcoal/55">제목 1줄</span>
+                  <input value={l1} onChange={(e) => setTitleLine(gi, "l1", e.target.value)} className="mt-1 w-full rounded-md border border-taupe/30 px-2 py-1.5" />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-charcoal/55">제목 2줄 (빈칸=숨김)</span>
+                  <input value={l2} onChange={(e) => setTitleLine(gi, "l2", e.target.value)} className="mt-1 w-full rounded-md border border-taupe/30 px-2 py-1.5" />
+                </label>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1">폰트
+                    <select value={o.titleFont} onChange={(e) => setO(gi, { titleFont: e.target.value as Opts["titleFont"] })} className="rounded border border-taupe/40 bg-white px-1 py-0.5">
+                      <option value="sans">산세리프</option><option value="serif">세리프</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-1 items-center gap-1">효과
+                    <select value={o.titleFx} onChange={(e) => setO(gi, { titleFx: e.target.value as Opts["titleFx"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
+                      {TITLE_FX.map((f) => <option key={f.v} value={f.v}>{f.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <label className="flex items-center gap-2">크기
+                  <input type="range" min={0.6} max={1.8} step={0.05} value={o.titleScale} onChange={(e) => setO(gi, { titleScale: Number(e.target.value) })} className="flex-1 accent-taupe" />
+                  <span className="w-10 text-right tabular-nums">{Math.round(o.titleScale * 100)}%</span>
+                </label>
+                <div className="flex items-center justify-between pt-1">
+                  <button onClick={() => { setTitleOv((m) => { const n = { ...m }; delete n[gi]; return n; }); setScripts((m) => { const n = { ...m }; delete n[gi]; return n; }); setO(gi, { titleFont: "sans", titleScale: 1, titleFx: "none" }); }} className="text-xs text-charcoal/55 hover:underline">기본값으로 되돌리기</button>
+                  <button onClick={() => setTitleEdit(null)} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep">완료</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ position: "fixed", left: -30000, top: 0, pointerEvents: "none" }} aria-hidden>
         {cap && <Poster ref={captureRef} {...posterProps(cap.gi)} />}
