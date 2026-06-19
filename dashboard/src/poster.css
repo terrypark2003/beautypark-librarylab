@@ -50,7 +50,7 @@
 .poster .title { font-weight: 800; font-size: 2.3em; line-height: 1.14; letter-spacing: -.01em; }
 .poster .title .l2 { display: block; color: var(--accent-deep); }
 
-.poster .panel { background: var(--panel); border-radius: 1.05em; box-shadow: 0 .7em 1.8em rgba(80,66,48,.13); display: flex; flex-direction: column; padding: .45em 0; margin-top: calc(var(--panel-top, 0) * 1em); margin-bottom: calc(var(--panel-bottom, 0) * 1em); }
+.poster .panel { position: relative; background: var(--panel); border-radius: 1.05em; box-shadow: 0 .7em 1.8em rgba(80,66,48,.13); display: flex; flex-direction: column; padding: .45em 0; margin-top: calc(var(--panel-top, 0) * 1em); margin-bottom: calc(var(--panel-bottom, 0) * 1em); }
 .poster .body > .panel { width: 100%; }
 .poster:not(.land) .body > .panel { flex: 1; width: calc(var(--panel-width, 100) * 1%); align-self: var(--panel-align, center); }
 .poster.land .body > .panel { flex: 1.15; align-self: stretch; max-height: 100%; }
@@ -80,6 +80,11 @@
 .poster .sticker { position: absolute; z-index: 6; line-height: 1; white-space: nowrap; user-select: none; cursor: grab; filter: drop-shadow(0 .08em .25em rgba(0,0,0,.18)); }
 .poster .sticker.badge { font-family: "Pretendard Variable", Pretendard, sans-serif; font-weight: 800; color: #fff; background: var(--accent-deep); padding: .22em .6em; border-radius: 1em; letter-spacing: .02em; }
 .poster .panel[data-drag] { cursor: grab; }
+/* 드래그로 위치 이동 가능한 요소(로고/타이틀) */
+.poster .logo-img[data-drag], .poster .logo[data-drag], .poster .head[data-drag] { cursor: grab; }
+/* 패널 하단 크기조절 핸들 — 평소엔 숨김(=PNG 캡처에 안 나옴), 패널에 마우스 올리면 표시 */
+.poster .panel-resize { position: absolute; left: 18%; right: 18%; bottom: -.45em; height: .9em; border-radius: 1em; cursor: ns-resize; opacity: 0; transition: opacity .15s; z-index: 7; }
+.poster .panel:hover .panel-resize { opacity: 1; background: color-mix(in srgb, var(--accent) 60%, #fff); box-shadow: 0 .1em .4em rgba(0,0,0,.18); }
 
 /* ===== 레이아웃 변형 ===== */
 /* center: 타이틀 가운데 정렬 + 패널 약간 좁게 */
@@ -101,3 +106,17 @@
 .poster.v-minimal .script { display: none; }
 .poster.v-minimal .title { font-size: 1.7em; font-weight: 700; }
 .poster.v-minimal .body { gap: .7em; }
+
+/* ===== 타이틀 글자 효과 (그림자/3D/외곽선/글로우) — has-photo의 기본 그림자보다 우선 ===== */
+.poster.fx-shadow .title, .poster.fx-shadow .script { text-shadow: 0 .05em .35em rgba(0,0,0,.5) !important; }
+.poster.fx-lift .title, .poster.fx-lift .script { text-shadow: 0 .11em .01em rgba(0,0,0,.32), 0 .28em .55em rgba(0,0,0,.4) !important; }
+.poster.fx-3d .title, .poster.fx-3d .title .l2 {
+  text-shadow: .015em .015em 0 rgba(0,0,0,.28), .03em .03em 0 rgba(0,0,0,.24), .045em .045em 0 rgba(0,0,0,.2),
+    .06em .06em 0 rgba(0,0,0,.16), .085em .085em .15em rgba(0,0,0,.42) !important;
+}
+.poster.fx-3d .script { text-shadow: .03em .03em 0 rgba(0,0,0,.22), .06em .06em .12em rgba(0,0,0,.35) !important; }
+.poster.fx-outline .title, .poster.fx-outline .title .l2, .poster.fx-outline .script {
+  -webkit-text-stroke: .025em var(--accent-deep); paint-order: stroke fill; text-shadow: 0 .04em .25em rgba(0,0,0,.3) !important;
+}
+.poster.has-photo.fx-outline .title, .poster.has-photo.fx-outline .title .l2, .poster.has-photo.fx-outline .script { -webkit-text-stroke-color: rgba(0,0,0,.55); }
+.poster.fx-glow .title, .poster.fx-glow .title .l2, .poster.fx-glow .script { text-shadow: 0 0 .18em var(--accent), 0 0 .4em var(--accent), 0 0 .75em var(--accent-deep) !important; }

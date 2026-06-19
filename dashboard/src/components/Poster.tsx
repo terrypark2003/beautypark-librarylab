@@ -42,8 +42,12 @@ interface Props {
   brandSub?: string; // 우상단 아랫줄(기본: BEOMEO)
   brandFont?: "sans" | "serif"; // 우상단 폰트
   brandStyle?: "stack" | "line" | "hidden"; // 우상단 형식: 2줄 / 한줄 / 숨김
+  titleFx?: string; // 타이틀 글자 효과: none|shadow|lift|3d|outline|glow
   panelDx?: number; // 패널 가로 이동(px, 마우스 드래그)
   panelDy?: number; // 패널 세로 이동(px)
+  panelScale?: number; // 패널 크기 배율(가장자리 드래그)
+  logoDx?: number; logoDy?: number; // 로고 이동(드래그)
+  headDx?: number; headDy?: number; // 타이틀(헤드라인) 이동(드래그)
   stickers?: Sticker[]; // 장식 스티커
 }
 
@@ -65,7 +69,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", panelDx = 0, panelDy = 0, stickers = [] }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", panelDx = 0, panelDy = 0, panelScale = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, stickers = [] }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -102,7 +106,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     };
 
     return (
-      <div ref={ref} className={`poster v-${variant}${photo ? " has-photo" : ""}${land ? " land" : ""}`} style={styleVars}>
+      <div ref={ref} className={`poster v-${variant}${photo ? " has-photo" : ""}${land ? " land" : ""}${titleFx && titleFx !== "none" ? ` fx-${titleFx}` : ""}`} style={styleVars}>
         {photo ? (
           <div className="photo" style={{ backgroundImage: `url(${photo})` }} />
         ) : (
@@ -120,9 +124,9 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
             <Spark cls="s3" />
             <div className="top">
               {logoUrl ? (
-                <img className="logo-img" src={photo && logoWhiteUrl ? logoWhiteUrl : logoUrl} alt="BEAUTY PARK 뷰티파크의원 범어점" />
+                <img className="logo-img" data-drag="logo" style={logoDx || logoDy ? { transform: `translate(${logoDx}px, ${logoDy}px)` } : undefined} src={photo && logoWhiteUrl ? logoWhiteUrl : logoUrl} alt="BEAUTY PARK 뷰티파크의원 범어점" />
               ) : (
-                <div className="logo">
+                <div className="logo" data-drag="logo" style={logoDx || logoDy ? { transform: `translate(${logoDx}px, ${logoDy}px)` } : undefined}>
                   <div>
                     <div className="wm">BEAUTY PARK</div>
                     <div className="sub">뷰티파크의원 범어점</div>
@@ -142,7 +146,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
 
         <div className="body">
           {showTitle && (
-            <div className="head">
+            <div className="head" data-drag="head" style={headDx || headDy ? { transform: `translate(${headDx}px, ${headDy}px)` } : undefined}>
               {(scriptOverride !== undefined ? scriptOverride : h.script) && (
                 <div className="script en">{scriptOverride !== undefined ? scriptOverride : h.script}</div>
               )}
@@ -154,7 +158,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
               </div>
             </div>
           )}
-          <div className="panel" data-drag="panel" style={panelDx || panelDy ? { transform: `translate(${panelDx}px, ${panelDy}px)` } : undefined}>
+          <div className="panel" data-drag="panel" style={{ transform: `translate(${panelDx}px, ${panelDy}px) scale(${panelScale})`, transformOrigin: "center top" }}>
             {showHeader && (headerPeriod || headerTarget) && (
               <div className="phead">
                 {[headerPeriod && `이벤트 기간 : ${headerPeriod}`, headerTarget && `이벤트 대상 : ${headerTarget}`].filter(Boolean).join("   |   ")}
@@ -177,6 +181,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
                 </div>
               );
             })}
+            <div className="panel-resize" data-drag="panel-size" title="가장자리를 위/아래로 드래그해 패널 크기 조절" />
           </div>
         </div>
 

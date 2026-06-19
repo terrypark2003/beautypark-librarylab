@@ -1,5 +1,5 @@
 // 캔바 OAuth 콜백: code → 토큰 교환 → 세션 쿠키 설정 → 앱으로 복귀.
-import { PKCE, isConfigured, parseCookies, unseal, exchangeCode, sessionToCookie, clearCookie } from "./_canva";
+import { PKCE, isConfigured, parseCookies, unseal, exchangeCode, sessionSetCookies, clearCookie } from "./_canva";
 
 export default async function handler(req: any, res: any) {
   const back = (ok: boolean, msg?: string) => {
@@ -20,7 +20,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     const tok = await exchangeCode(code, pkce.v, pkce.r);
-    res.setHeader("Set-Cookie", [sessionToCookie(tok), clearCookie(PKCE, "/api/canva")]);
+    res.setHeader("Set-Cookie", [...sessionSetCookies(tok), clearCookie(PKCE, "/api/canva")]);
     back(true);
   } catch (e: any) {
     back(false, String(e?.message || e).slice(0, 120));

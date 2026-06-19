@@ -2,6 +2,7 @@
 import { isConfigured, getAccessToken, canvaFetch } from "./_canva";
 
 export default async function handler(req: any, res: any) {
+  res.setHeader("Cache-Control", "no-store"); // 연결 직후 상태가 캐시(304)로 묵지 않도록
   if (!isConfigured()) { res.status(200).json({ configured: false, connected: false }); return; }
 
   let token: string | null = null;
