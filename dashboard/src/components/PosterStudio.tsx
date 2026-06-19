@@ -104,7 +104,11 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
-  const [cap, setCap] = useState<{ gi: number; name: string } | null>(null);
+  const [cap, setCap] = useState<{ gi: number; name: string; action: "download" | "canva" } | null>(null);
+  // 캔바 연동
+  const [canva, setCanva] = useState<{ configured: boolean; connected: boolean; name?: string } | null>(null);
+  const [canvaBusy, setCanvaBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const size = SIZES.find((s) => s.key === sizeKey)!;
   const land = size.w > size.h; // 가로 팝업 등 가로형
@@ -243,28 +247,58 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   useEffect(() => {
     if (!cap) return;
     let cancelled = false;
+    const toCanva = cap.action === "canva";
     (async () => {
       try {
         await (document as any).fonts?.ready;
         await new Promise((r) => setTimeout(r, 150));
         const node = captureRef.current;
         if (node && !cancelled) {
-          const url = await toPng(node, { pixelRatio: size.w >= 1600 ? 1.5 : 2, width: size.w, height: size.h, cacheBust: true });
-          const a = document.createElement("a"); a.href = url; a.download = cap.name; a.click();
+          // 캔바 전송은 원본 사이즈(pixelRatio 1) — 서버리스 본문 한도(4.5MB)와 캔바 디자인 크기에 맞춤
+          const url = await toPng(node, { pixelRatio: toCanva ? 1 : size.w >= 1600 ? 1.5 : 2, width: size.w, height: size.h, cacheBust: true });
+          if (toCanva) await sendToCanva(cap.gi, url);
+          else { const a = document.createElement("a"); a.href = url; a.download = cap.name; a.click(); }
         }
-      } catch (e) { setError(`PNG 생성 실패: ${(e as Error).message}`); }
-      finally { if (!cancelled) setCap(null); }
+      } catch (e) { setError(`${toCanva ? "캔바 전송" : "PNG 생성"} 실패: ${(e as Error).message}`); }
+      finally { if (!cancelled) { setCap(null); if (toCanva) setCanvaBusy(false); } }
     })();
     return () => { cancelled = true; };
   }, [cap, size.w, size.h]);
 
+  // 캔바 연결 상태 조회 + 콜백 복귀 처리
+  const refreshCanva = () => fetch("/api/canva/status").then((r) => r.json()).then(setCanva).catch(() => {});
+  useEffect(() => { refreshCanva(); }, []);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const c = p.get("canva");
+    if (!c) return;
+    if (c === "connected") { setNotice("캔바 계정이 연결되었습니다 ✓"); refreshCanva(); }
+    else setError(`캔바 연결 실패: ${p.get("msg") || ""}`);
+    p.delete("canva"); p.delete("msg");
+    const qs = p.toString();
+    window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+  }, []);
+
+  async function sendToCanva(gi: number, dataUrl: string) {
+    const r = await fetch("/api/canva/export", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageDataUrl: dataUrl, title: `뷰티파크 ${data.sheet} ${data.groups[gi].group}`, width: size.w, height: size.h }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.editUrl) throw new Error(d.error || `export ${r.status}`);
+    setNotice("캔바에 디자인을 만들었어요. 새 탭에서 편집하세요 ✓");
+    window.open(d.editUrl, "_blank");
+  }
+  const exportCanva = (gi: number) => { setError(null); setNotice(null); setCanvaBusy(true); setCap({ gi, name: fileName(gi), action: "canva" }); };
+  async function canvaLogout() { await fetch("/api/canva/logout", { method: "POST" }).catch(() => {}); refreshCanva(); }
+
   const fileName = (gi: number) => `뷰티파크_${data.sheet}_${sanitize(data.groups[gi].group)}_${sizeKey}.png`;
-  const downloadOne = (gi: number) => setCap({ gi, name: fileName(gi) });
+  const downloadOne = (gi: number) => setCap({ gi, name: fileName(gi), action: "download" });
   async function downloadAll() {
     setBusy(true);
     for (let gi = 0; gi < data.groups.length; gi++) {
       await new Promise<void>((resolve) => {
-        setCap({ gi, name: fileName(gi) });
+        setCap({ gi, name: fileName(gi), action: "download" });
         const iv = setInterval(() => { if (captureRef.current === null) { clearInterval(iv); resolve(); } }, 50);
         setTimeout(() => { clearInterval(iv); resolve(); }, 3000);
       });
@@ -311,10 +345,19 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
             <input ref={fileRef} type="file" accept=".xlsx" onChange={onFile} className="hidden" />
             <button onClick={() => fileRef.current?.click()} className="rounded-md bg-taupe px-4 py-2 text-sm font-semibold text-white transition hover:bg-taupe-deep">엑셀 업로드</button>
             <button onClick={downloadAll} disabled={busy} className="rounded-md border border-taupe/40 bg-white px-4 py-2 text-sm font-semibold text-taupe-deep transition hover:bg-taupe/10 disabled:opacity-50">{busy ? "생성 중…" : "전체 PNG"}</button>
+            {canva?.configured && (canva.connected ? (
+              <span className="flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-2 text-xs font-medium text-emerald-700">
+                캔바 {canva.name ? `· ${canva.name}` : "연결됨"} ✓
+                <button onClick={canvaLogout} className="text-emerald-600/70 hover:underline">해제</button>
+              </span>
+            ) : (
+              <a href="/api/canva/login" className="rounded-md border border-taupe/40 bg-white px-4 py-2 text-sm font-semibold text-taupe-deep transition hover:bg-taupe/10">캔바 연결</a>
+            ))}
           </div>
         </div>
-        <p className="mt-2 text-xs text-charcoal/55">💡 사이즈를 고르고, 각 포스터의 <b>⚙ 세부옵션</b>에서 로고·패널·할인율·헤더를 <b>포스터별로</b> 조절하세요. 배경을 올리면 그 위에 합성됩니다.</p>
+        <p className="mt-2 text-xs text-charcoal/55">💡 사이즈를 고르고, 각 포스터의 <b>⚙ 세부옵션</b>에서 로고·패널·할인율·헤더를 <b>포스터별로</b> 조절하세요. 배경을 올리면 그 위에 합성됩니다.{canva?.connected && <> 포스터별 <b>↗ 캔바에서 편집</b>으로 캔바에 디자인을 만들 수 있어요.</>}</p>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        {notice && <p className="mt-2 text-sm text-emerald-700">{notice}</p>}
       </div>
 
       <div className={land ? "grid justify-items-center gap-7 grid-cols-1" : "grid gap-7 md:grid-cols-2 xl:grid-cols-3"}>
@@ -354,6 +397,13 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                 {plate && <button onClick={() => removePlate(gi)} className="rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-charcoal/60 hover:bg-taupe/10">제거</button>}
                 <button onClick={() => setOpenOpts((m) => ({ ...m, [gi]: !m[gi] }))} className={`rounded-md border px-2 py-1.5 text-xs ${openOpts[gi] ? "border-taupe bg-taupe text-white" : "border-taupe/40 text-taupe-deep hover:bg-taupe/10"}`}>⚙</button>
               </div>
+
+              {canva?.connected && (
+                <button onClick={() => exportCanva(gi)} disabled={canvaBusy} style={{ width: previewW }}
+                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50">
+                  {canvaBusy ? "캔바로 보내는 중…" : "↗ 캔바에서 편집 (디자인 생성)"}
+                </button>
+              )}
 
               <div className="flex items-center gap-2" style={{ width: previewW }}>
                 <span className="shrink-0 text-[11px] text-charcoal/50">✎ 영문태그</span>
