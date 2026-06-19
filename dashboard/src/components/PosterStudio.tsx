@@ -44,6 +44,7 @@ interface Opts {
   headerPeriod: string;
   headerTarget: string;
   showDiscount: boolean;
+  showPrice: boolean; // 가격 표시 ON/OFF
   nameSize: number; // 상품명 크기 배율
   nameWeight: number; // 상품명 굵기
   priceSize: number; // 금액 크기 배율
@@ -56,7 +57,7 @@ interface Opts {
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
-  showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false,
+  showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
   brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none",
 };
@@ -67,11 +68,19 @@ const SIZES = [
   { key: "square", label: "인스타 1:1 (1080×1080)", w: 1080, h: 1080 },
   { key: "story", label: "스토리 9:16 (1080×1920)", w: 1080, h: 1920 },
   { key: "wide", label: "가로 팝업 16:9 (1200×675)", w: 1200, h: 675 },
+  { key: "pop11", label: "홈팝업 1:1 (1280×1280)", w: 1280, h: 1280 },
+  { key: "pop43", label: "홈팝업 4:3 (1704×1280)", w: 1704, h: 1280 },
+  { key: "pop169", label: "홈팝업 16:9 (2400×1350)", w: 2400, h: 1350 },
+  { key: "pop34", label: "홈팝업 3:4 (1120×1492)", w: 1120, h: 1492 },
+  { key: "popA4", label: "홈팝업 A4 (1240×1754)", w: 1240, h: 1754 },
+  { key: "promoThumb", label: "기획전 썸네일 (1080×540)", w: 1080, h: 540 },
+  { key: "promoGuide", label: "기획전 안내용 (960×1280)", w: 960, h: 1280 },
 ] as const;
 
 const LAYOUTS = [
   { key: "classic", label: "기본" }, { key: "center", label: "센터" }, { key: "band", label: "밴드" },
   { key: "editorial", label: "에디토리얼" }, { key: "minimal", label: "미니멀" },
+  { key: "studio", label: "미니멀 에디토리얼" },
 ] as const;
 
 const PREVIEW_W = 330; // 세로형 미리보기 폭
@@ -268,8 +277,10 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         await new Promise((r) => setTimeout(r, 150));
         const node = captureRef.current;
         if (node && !cancelled) {
-          // 캔바 전송은 원본 사이즈(pixelRatio 1) — 서버리스 본문 한도(4.5MB)와 캔바 디자인 크기에 맞춤
-          const url = await toPng(node, { pixelRatio: toCanva ? 1 : size.w >= 1600 ? 1.5 : 2, width: size.w, height: size.h, cacheBust: true });
+          // 캔바 전송은 원본 사이즈(서버리스 본문 한도), 홈팝업·기획전은 권장 해상도 그대로(정확히), 그 외는 2배(대형은 1.5배)
+          const exact = toCanva || sizeKey.startsWith("pop") || sizeKey.startsWith("promo");
+          const pr = exact ? 1 : size.w >= 1600 ? 1.5 : 2;
+          const url = await toPng(node, { pixelRatio: pr, width: size.w, height: size.h, cacheBust: true });
           if (toCanva) await sendToCanva(cap.gi, url);
           else { const a = document.createElement("a"); a.href = url; a.download = cap.name; a.click(); }
         }
@@ -332,7 +343,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       bgUrl: plate?.url, photoBg: !plate ? themeBg(themeFor(gi)) : undefined, hideTitle: plate?.hideTitle,
       logoScale: o.logoScale, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
-      showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount,
+      showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount, showPrice: o.showPrice,
       nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
       brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle, titleFx: o.titleFx,
       panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScale: L(gi).panelScale,
@@ -473,6 +484,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
 
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-1">정렬<select value={o.panelAlign} onChange={(e) => setO(gi, { panelAlign: e.target.value as any })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="left">좌</option><option value="center">중</option><option value="right">우</option></select></label>
+                    <label className="flex items-center gap-1"><input type="checkbox" checked={o.showPrice} onChange={(e) => setO(gi, { showPrice: e.target.checked })} className="accent-taupe" />가격</label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showDiscount} onChange={(e) => setO(gi, { showDiscount: e.target.checked })} className="accent-taupe" />할인율</label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showHeader} onChange={(e) => setO(gi, { showHeader: e.target.checked })} className="accent-taupe" />헤더바</label>
                   </div>

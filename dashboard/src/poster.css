@@ -120,3 +120,31 @@
 }
 .poster.has-photo.fx-outline .title, .poster.has-photo.fx-outline .title .l2, .poster.has-photo.fx-outline .script { -webkit-text-stroke-color: rgba(0,0,0,.55); }
 .poster.fx-glow .title, .poster.fx-glow .title .l2, .poster.fx-glow .script { text-shadow: 0 0 .18em var(--accent), 0 0 .4em var(--accent), 0 0 .75em var(--accent-deep) !important; }
+
+/* ===== studio: 미니멀 에디토리얼 (좌우 분할 헤어라인 헤드라인 + 중앙 제품명 + 하단 로고) ===== */
+.poster.v-studio .top, .poster.v-studio .spk, .poster.v-studio .foot, .poster.v-studio .vat { display: none; }
+.poster.v-studio .body { padding: .4em 0 .2em; }
+.poster.v-studio .studio-head { width: 100%; }
+.poster.v-studio .hl-row { display: flex; align-items: flex-end; gap: .55em; width: 100%; }
+.poster.v-studio .hl-l { min-width: 0; word-break: keep-all; font-weight: 700; font-size: 1.55em; line-height: 1.05; letter-spacing: -.01em; }
+.poster.v-studio .hl-r { white-space: nowrap; font-weight: 700; font-size: 1.55em; line-height: 1.05; letter-spacing: -.01em; color: var(--accent-deep); }
+.poster.v-studio .hl-rule { flex: 1 0 .8em; height: 0; border-top: 1px solid currentColor; margin-bottom: .5em; opacity: .5; }
+.poster.v-studio .studio-head .script { font-size: 1.7em; margin-top: .3em; }
+/* 제품명: 흰 박스 제거 + 세로 중앙 + 가운데 정렬 */
+.poster.v-studio .body > .panel { flex: none; margin: auto 0; align-self: center; width: 100%; background: transparent; box-shadow: none; padding: 0; }
+.poster.v-studio .row { flex: none; justify-content: center; border-bottom: 0; padding: .3em 1em; gap: .8em; }
+.poster.v-studio .name { max-width: 100%; text-align: center; font-weight: 500; letter-spacing: .04em; }
+.poster.v-studio .price { justify-content: center; }
+/* 하단 중앙 로고 + 위쪽 헤어라인 */
+.poster.v-studio .studio-brand { display: flex; flex-direction: column; align-items: center; gap: .25em; padding: .85em 0 .15em; border-top: 1px solid currentColor; }
+.poster.v-studio .studio-logo { height: 3em; width: auto; max-width: 72%; object-fit: contain; }
+.poster.v-studio.has-photo .studio-logo { filter: drop-shadow(0 .06em .45em rgba(0,0,0,.45)); }
+.poster.v-studio .studio-wm { text-align: center; }
+.poster.v-studio .studio-wm .wm { font-family: "Playfair Display", serif; font-weight: 700; font-size: 1.7em; letter-spacing: .3em; color: var(--accent-deep); }
+.poster.v-studio .studio-wm .sub { font-size: .58em; letter-spacing: .5em; opacity: .7; margin-top: .45em; }
+/* 사진 위에서는 텍스트/라인 흰색 */
+.poster.has-photo.v-studio .hl-l, .poster.has-photo.v-studio .hl-r, .poster.has-photo.v-studio .name,
+.poster.has-photo.v-studio .now, .poster.has-photo.v-studio .was, .poster.has-photo.v-studio .studio-wm .wm, .poster.has-photo.v-studio .studio-wm .sub {
+  color: #fff !important; text-shadow: 0 .05em .4em rgba(0,0,0,.42);
+}
+.poster.has-photo.v-studio .hl-rule, .poster.has-photo.v-studio .studio-brand { border-color: rgba(255,255,255,.72); }

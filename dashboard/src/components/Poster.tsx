@@ -34,6 +34,7 @@ interface Props {
   headerPeriod?: string;
   headerTarget?: string;
   showDiscount?: boolean; // 할인율 % 배지
+  showPrice?: boolean; // 가격 표시 여부(끄면 시술명만)
   nameSize?: number; // 상품명 크기 배율
   nameWeight?: number; // 상품명 굵기
   priceSize?: number; // 금액 크기 배율
@@ -69,7 +70,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", panelDx = 0, panelDy = 0, panelScale = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, stickers = [] }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", panelDx = 0, panelDy = 0, panelScale = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, stickers = [] }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -81,6 +82,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     const land = width > height;
     const brandTopText = brandTop && brandTop.trim() ? brandTop : `EVENT · ${sheet}`;
     const brandSubText = brandSub !== undefined ? brandSub : "BEOMEO";
+    const scriptText = scriptOverride !== undefined ? scriptOverride : h.script;
+    const isStudio = variant === "studio";
 
     const styleVars = {
       ["--w" as any]: width,
@@ -146,16 +149,27 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
 
         <div className="body">
           {showTitle && (
-            <div className="head" data-drag="head" style={headDx || headDy ? { transform: `translate(${headDx}px, ${headDy}px)` } : undefined}>
-              {(scriptOverride !== undefined ? scriptOverride : h.script) && (
-                <div className="script en">{scriptOverride !== undefined ? scriptOverride : h.script}</div>
+            <div className={`head${isStudio ? " studio-head" : ""}`} data-drag="head" style={headDx || headDy ? { transform: `translate(${headDx}px, ${headDy}px)` } : undefined}>
+              {isStudio ? (
+                <>
+                  <div className="hl-row">
+                    <span className="hl-l">{h.l1}</span>
+                    <span className="hl-rule" />
+                    {h.l2 && <span className="hl-r">{h.l2}</span>}
+                  </div>
+                  {scriptText && <div className="script en">{scriptText}</div>}
+                </>
+              ) : (
+                <>
+                  {scriptText && <div className="script en">{scriptText}</div>}
+                  {h.sup && <div className="sup">{h.sup}</div>}
+                  {h.badge && <div className="badge">{h.badge}</div>}
+                  <div className="title">
+                    {h.l1}
+                    {h.l2 && <span className="l2">{h.l2}</span>}
+                  </div>
+                </>
               )}
-              {h.sup && <div className="sup">{h.sup}</div>}
-              {h.badge && <div className="badge">{h.badge}</div>}
-              <div className="title">
-                {h.l1}
-                {h.l2 && <span className="l2">{h.l2}</span>}
-              </div>
             </div>
           )}
           <div className="panel" data-drag="panel" style={{ transform: `translate(${panelDx}px, ${panelDy}px) scale(${panelScale})`, transformOrigin: "center top" }}>
@@ -170,14 +184,16 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
               return (
                 <div className="row" key={i}>
                   <div className="name" style={{ fontSize: `${nameScale(it.name) * nameSize}em` }}>{it.name}</div>
-                  <div className="price">
-                    {showDiscount && disc > 0 && <span className="disc">{disc}%</span>}
-                    {n != null && <span className="was">{manwon(n)}만원</span>}
-                    <span className="now">
-                      {manwon(e)}
-                      <span className="unit">만원</span>
-                    </span>
-                  </div>
+                  {showPrice && (
+                    <div className="price">
+                      {showDiscount && disc > 0 && <span className="disc">{disc}%</span>}
+                      {n != null && <span className="was">{manwon(n)}만원</span>}
+                      <span className="now">
+                        {manwon(e)}
+                        <span className="unit">만원</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -187,6 +203,19 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
 
         <div className="foot">부가세 10% 별도 &nbsp;·&nbsp; 현금 / 카드 동일</div>
         <div className="vat">VAT 별도</div>
+
+        {showTitle && isStudio && (
+          <div className="studio-brand">
+            {logoUrl ? (
+              <img className="studio-logo" src={photo && logoWhiteUrl ? logoWhiteUrl : logoUrl} alt="BEAUTY PARK 뷰티파크의원 범어점" />
+            ) : (
+              <div className="studio-wm">
+                <div className="wm">BEAUTY PARK</div>
+                <div className="sub">뷰티파크의원 범어점</div>
+              </div>
+            )}
+          </div>
+        )}
 
         {stickers.map((s) => {
           const svg = s.char.startsWith("svg:") ? SVGS[s.char.slice(4)] : null;
