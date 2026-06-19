@@ -19,7 +19,10 @@ function buildPrompt(desc: string): string {
   "scriptColor": "#영문 태그 글자색",
   "panel": "rgba(255,255,255,.97) 형태의 카드(가격표) 배경",
   "divider": "#카드 구분선(연한 색)",
-  "was": "#정가 취소선 회색"
+  "was": "#정가 취소선 회색",
+  "bgQuery": "이 분위기에 어울리는 배경 사진을 찾기 위한 영문 스톡 검색어(예: soft beige silk texture, calm blue water surface)",
+  "layout": "classic | center | band | editorial | minimal | studio 중 하나(이 분위기에 가장 어울리는 레이아웃. band=제목을 컬러 박스 안에, studio=풀블리드 사진+미니멀, editorial=좌측 강조선)",
+  "titleFx": "none | shadow | lift | 3d | outline | glow | gradient | gold | longshadow | emboss 중 하나(제목 글자 효과)"
 }
 규칙:
 - 색은 모두 hex(#RRGGBB) 또는 rgba()/그라데이션 형식의 유효한 CSS 값.
@@ -28,7 +31,9 @@ function buildPrompt(desc: string): string {
 - accent/accentDeep/scriptColor는 배경과 어울리되 충분히 보이는 색.`;
 }
 
-type Palette = { label: string; tag: string; bg: string; blob: string; ink: string; accent: string; accentDeep: string; scriptColor: string; panel: string; divider: string; was: string };
+type Palette = { label: string; tag: string; bg: string; blob: string; ink: string; accent: string; accentDeep: string; scriptColor: string; panel: string; divider: string; was: string; bgQuery: string; layout: string; titleFx: string };
+const LAYOUTS = ["classic", "center", "band", "editorial", "minimal", "studio"];
+const FX = ["none", "shadow", "lift", "3d", "outline", "glow", "gradient", "gold", "longshadow", "emboss"];
 
 function parsePalette(text: string): Palette | null {
   try {
@@ -43,6 +48,9 @@ function parsePalette(text: string): Palette | null {
       bg: o.bg, blob: o.blob || "radial-gradient(55% 40% at 80% 8%, rgba(255,255,255,.4), transparent 65%)",
       ink: o.ink, accent: o.accent, accentDeep: o.accentDeep, scriptColor: o.scriptColor || o.accent,
       panel: o.panel || "rgba(255,255,255,.97)", divider: o.divider || "#ECECEC", was: o.was || "#B6B3AE",
+      bgQuery: String(o.bgQuery || "").slice(0, 70),
+      layout: LAYOUTS.includes(o.layout) ? o.layout : "classic",
+      titleFx: FX.includes(o.titleFx) ? o.titleFx : "none",
     };
   } catch { return null; }
 }
