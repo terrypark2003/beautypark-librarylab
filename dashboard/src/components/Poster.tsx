@@ -50,9 +50,13 @@ interface Props {
   titleScale?: number; // 제목 크기 배율
   panelDx?: number; // 패널 가로 이동(px, 마우스 드래그)
   panelDy?: number; // 패널 세로 이동(px)
-  panelScale?: number; // 패널 크기 배율(가장자리 드래그)
+  panelScaleX?: number; // 패널 가로 크기 배율(우측 가장자리 드래그)
+  panelScaleY?: number; // 패널 세로 크기 배율(하단 가장자리 드래그)
   logoDx?: number; logoDy?: number; // 로고 이동(드래그)
   headDx?: number; headDy?: number; // 타이틀(헤드라인) 이동(드래그)
+  showVat?: boolean; // 우하단 'VAT 별도' 표시
+  footDx?: number; footDy?: number; footScale?: number; // 하단 안내문구 이동/크기
+  vatDx?: number; vatDy?: number; vatScale?: number; // VAT 배지 이동/크기
   stickers?: Sticker[]; // 장식 스티커
 }
 
@@ -74,7 +78,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, panelDx = 0, panelDy = 0, panelScale = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, stickers = [] }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [] }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -106,6 +110,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
       ["--price-weight" as any]: pf.weight,
       ["--title-scale" as any]: titleScale,
       ["--title-font" as any]: titleFamily,
+      ["--foot-scale" as any]: footScale,
+      ["--vat-scale" as any]: vatScale,
       ["--bg" as any]: t.bg,
       ["--blob" as any]: t.blob,
       ["--ink" as any]: t.ink,
@@ -181,7 +187,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
               )}
             </div>
           )}
-          <div className="panel" data-drag="panel" style={{ transform: `translate(${panelDx}px, ${panelDy}px) scale(${panelScale})`, transformOrigin: "center top" }}>
+          <div className="panel" data-drag="panel" style={{ transform: `translate(${panelDx}px, ${panelDy}px) scale(${panelScaleX}, ${panelScaleY})`, transformOrigin: "center top" }}>
             {showHeader && (headerPeriod || headerTarget) && (
               <div className="phead">
                 {[headerPeriod && `이벤트 기간 : ${headerPeriod}`, headerTarget && `이벤트 대상 : ${headerTarget}`].filter(Boolean).join("   |   ")}
@@ -206,12 +212,13 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
                 </div>
               );
             })}
-            <div className="panel-resize" data-drag="panel-size" title="가장자리를 위/아래로 드래그해 패널 크기 조절" />
+            <div className="panel-resize y" data-drag="panel-size-y" title="아래로 드래그해 패널 높이 조절" />
+            <div className="panel-resize x" data-drag="panel-size-x" title="좌우로 드래그해 패널 너비 조절" />
           </div>
         </div>
 
-        <div className="foot">부가세 10% 별도 &nbsp;·&nbsp; 현금 / 카드 동일</div>
-        <div className="vat">VAT 별도</div>
+        <div className="foot" data-drag="foot" style={footDx || footDy ? { transform: `translate(${footDx}px, ${footDy}px)` } : undefined}>부가세 10% 별도 &nbsp;·&nbsp; 현금 / 카드 동일</div>
+        {showVat && <div className="vat" data-drag="vat" style={vatDx || vatDy ? { transform: `translate(${vatDx}px, ${vatDy}px)` } : undefined}>VAT 별도</div>}
 
         {showTitle && isStudio && (
           <div className="studio-brand">

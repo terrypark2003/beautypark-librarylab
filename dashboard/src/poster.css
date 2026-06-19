@@ -64,8 +64,8 @@
 .poster .now { font-family: var(--price-font, "Playfair Display", serif); font-weight: var(--price-weight, 900); font-size: calc(2.25em * var(--price-size, 1)); color: var(--accent-deep); line-height: 1; }
 .poster .unit { font-family: "Pretendard Variable", Pretendard; font-size: .42em; font-weight: 800; margin-left: .06em; }
 
-.poster .foot { position: relative; text-align: center; font-size: .84em; font-weight: 600; color: var(--accent); padding-top: .3em; }
-.poster .vat { position: absolute; right: 1.9em; bottom: 1.6em; border: .05em solid color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent); font-size: .62em; font-weight: 700; padding: .3em .8em; border-radius: .3em; }
+.poster .foot { position: relative; text-align: center; font-size: calc(.84em * var(--foot-scale, 1)); font-weight: 600; color: var(--accent); padding-top: .3em; }
+.poster .vat { position: absolute; right: 1.9em; bottom: 1.6em; border: .05em solid color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent); font-size: calc(.62em * var(--vat-scale, 1)); font-weight: 700; padding: .3em .8em; border-radius: .3em; }
 
 .poster.has-photo .wm, .poster.has-photo .sub, .poster.has-photo .branch, .poster.has-photo .branch b,
 .poster.has-photo .title, .poster.has-photo .title .l2, .poster.has-photo .sup, .poster.has-photo .script {
@@ -80,10 +80,12 @@
 .poster .sticker { position: absolute; z-index: 6; line-height: 1; white-space: nowrap; user-select: none; cursor: grab; filter: drop-shadow(0 .08em .25em rgba(0,0,0,.18)); }
 .poster .sticker.badge { font-family: "Pretendard Variable", Pretendard, sans-serif; font-weight: 800; color: #fff; background: var(--accent-deep); padding: .22em .6em; border-radius: 1em; letter-spacing: .02em; }
 .poster .panel[data-drag] { cursor: grab; }
-/* 드래그로 위치 이동 가능한 요소(로고/타이틀) */
-.poster .logo-img[data-drag], .poster .logo[data-drag], .poster .head[data-drag] { cursor: grab; }
-/* 패널 하단 크기조절 핸들 — 평소엔 숨김(=PNG 캡처에 안 나옴), 패널에 마우스 올리면 표시 */
-.poster .panel-resize { position: absolute; left: 18%; right: 18%; bottom: -.45em; height: .9em; border-radius: 1em; cursor: ns-resize; opacity: 0; transition: opacity .15s; z-index: 7; }
+/* 드래그로 위치 이동 가능한 요소(로고/타이틀/하단문구/VAT) */
+.poster .logo-img[data-drag], .poster .logo[data-drag], .poster .head[data-drag], .poster .foot[data-drag], .poster .vat[data-drag] { cursor: grab; }
+/* 패널 크기조절 핸들 — 평소엔 숨김(=PNG 캡처에 안 나옴), 패널에 마우스 올리면 표시 */
+.poster .panel-resize { position: absolute; border-radius: 1em; opacity: 0; transition: opacity .15s; z-index: 7; }
+.poster .panel-resize.y { left: 18%; right: 18%; bottom: -.45em; height: .9em; cursor: ns-resize; }
+.poster .panel-resize.x { top: 18%; bottom: 18%; right: -.45em; width: .9em; cursor: ew-resize; }
 .poster .panel:hover .panel-resize { opacity: 1; background: color-mix(in srgb, var(--accent) 60%, #fff); box-shadow: 0 .1em .4em rgba(0,0,0,.18); }
 
 /* ===== 레이아웃 변형 ===== */

@@ -30,9 +30,9 @@ const clamp = (v: number) => Math.max(-10, Math.min(110, v));
 const sanitize = (s: string) => s.replace(/[\\/:*?"<>|\n]/g, "").replace(/\s+/g, "").slice(0, 36);
 type Plate = { url: string; hideTitle: boolean };
 type XY = { dx: number; dy: number };
-// 마우스 드래그로 조절되는 포스터별 배치(패널/로고/타이틀 이동 + 패널 크기)
-type Layout = { panel: XY; logo: XY; head: XY; panelScale: number };
-const DEFAULT_LAYOUT: Layout = { panel: { dx: 0, dy: 0 }, logo: { dx: 0, dy: 0 }, head: { dx: 0, dy: 0 }, panelScale: 1 };
+// 마우스 드래그로 조절되는 포스터별 배치(패널/로고/타이틀/하단문구/VAT 이동 + 패널 가로·세로 크기)
+type Layout = { panel: XY; logo: XY; head: XY; foot: XY; vat: XY; panelScaleX: number; panelScaleY: number };
+const DEFAULT_LAYOUT: Layout = { panel: { dx: 0, dy: 0 }, logo: { dx: 0, dy: 0 }, head: { dx: 0, dy: 0 }, foot: { dx: 0, dy: 0 }, vat: { dx: 0, dy: 0 }, panelScaleX: 1, panelScaleY: 1 };
 
 interface Opts {
   logoScale: number;
@@ -45,6 +45,9 @@ interface Opts {
   headerTarget: string;
   showDiscount: boolean;
   showPrice: boolean; // 가격 표시 ON/OFF
+  showVat: boolean; // 우하단 VAT 별도 표시
+  footScale: number; // 하단 안내문구 크기
+  vatScale: number; // VAT 배지 크기
   nameSize: number; // 상품명 크기 배율
   nameWeight: number; // 상품명 굵기
   priceSize: number; // 금액 크기 배율
@@ -59,7 +62,7 @@ interface Opts {
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
-  showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true,
+  showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true, showVat: true, footScale: 1, vatScale: 1,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
   brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1,
 };
@@ -150,6 +153,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setLayouts({}); setStickers({}); setSelSticker(null); setTitleOv({}); setTitleEdit(null); }, [data]);
   const L = (gi: number): Layout => ({ ...DEFAULT_LAYOUT, ...(layouts[gi] || {}) });
   const setL = (gi: number, patch: Partial<Layout>) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT, ...(m[gi] || {}), ...patch } }));
+  const lastTapRef = useRef<{ gi: number; t: number } | null>(null); // 타이틀 더블탭 감지용
 
   // 마우스 드래그(패널/로고/타이틀 이동 · 패널 크기 · 스티커 이동)
   function onDragStart(gi: number, e: React.PointerEvent) {
@@ -157,14 +161,23 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     if (!el) return;
     const tag = el.getAttribute("data-drag")!;
     const scale = previewW / size.w;
+    // 타이틀 더블탭 → 편집 팝업 (드래그용 preventDefault가 네이티브 dblclick을 막으므로 수동 감지)
+    if (tag === "head") {
+      const now = Date.now();
+      const lt = lastTapRef.current;
+      if (lt && lt.gi === gi && now - lt.t < 350) { lastTapRef.current = null; setTitleEdit(gi); return; }
+      lastTapRef.current = { gi, t: now };
+    }
     if (tag.startsWith("s:")) {
       const id = tag.slice(2);
       const st = (stickers[gi] || []).find((s) => s.id === id);
       if (!st) return;
       dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { x: st.x, y: st.y } };
       setSelSticker({ gi, id });
-    } else if (tag === "panel-size") {
-      dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { s: L(gi).panelScale } };
+    } else if (tag === "panel-size-x") {
+      dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { s: L(gi).panelScaleX } };
+    } else if (tag === "panel-size-y") {
+      dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { s: L(gi).panelScaleY } };
     } else {
       // panel | logo | head
       const cur = (L(gi) as any)[tag] as XY;
@@ -183,9 +196,12 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       const x = clamp(d.base.x + (dxp / size.w) * 100);
       const y = clamp(d.base.y + (dyp / size.h) * 100);
       setStickers((m) => ({ ...m, [d.gi]: (m[d.gi] || []).map((s) => (s.id === id ? { ...s, x, y } : s)) }));
-    } else if (d.tag === "panel-size") {
-      const s = Math.max(0.6, Math.min(1.8, d.base.s + dyp / 500)); // 아래로 끌면 커지고 위로 끌면 작아짐
-      setL(d.gi, { panelScale: s });
+    } else if (d.tag === "panel-size-x") {
+      const s = Math.max(0.5, Math.min(1.8, d.base.s + dxp / 420)); // 오른쪽으로 끌면 넓어짐
+      setL(d.gi, { panelScaleX: s });
+    } else if (d.tag === "panel-size-y") {
+      const s = Math.max(0.5, Math.min(1.8, d.base.s + dyp / 420)); // 아래로 끌면 높아짐
+      setL(d.gi, { panelScaleY: s });
     } else {
       setL(d.gi, { [d.tag]: { dx: d.base.dx + dxp, dy: d.base.dy + dyp } } as Partial<Layout>);
     }
@@ -360,11 +376,13 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       logoScale: o.logoScale, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount, showPrice: o.showPrice,
+      showVat: o.showVat, footScale: o.footScale, vatScale: o.vatScale,
       nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
       brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle,
       titleFx: o.titleFx, titleFont: o.titleFont, titleScale: o.titleScale, l1Override: titleOv[gi]?.l1, l2Override: titleOv[gi]?.l2,
-      panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScale: L(gi).panelScale,
+      panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScaleX: L(gi).panelScaleX, panelScaleY: L(gi).panelScaleY,
       logoDx: L(gi).logo.dx, logoDy: L(gi).logo.dy, headDx: L(gi).head.dx, headDy: L(gi).head.dy,
+      footDx: L(gi).foot.dx, footDy: L(gi).foot.dy, vatDx: L(gi).vat.dx, vatDy: L(gi).vat.dy,
       stickers: stickers[gi] || [],
     };
   };
@@ -501,6 +519,14 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showDiscount} onChange={(e) => setO(gi, { showDiscount: e.target.checked })} className="accent-taupe" />할인율</label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showHeader} onChange={(e) => setO(gi, { showHeader: e.target.checked })} className="accent-taupe" />헤더바</label>
                   </div>
+
+                  <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
+                    <div className="flex items-center justify-between"><span className="font-medium text-charcoal/60">하단 문구</span><label className="flex items-center gap-1"><input type="checkbox" checked={o.showVat} onChange={(e) => setO(gi, { showVat: e.target.checked })} className="accent-taupe" />VAT 별도</label></div>
+                    <label className="flex items-center gap-2">부가세 문구 크기<input type="range" min={0.6} max={1.8} step={0.05} value={o.footScale} onChange={(e) => setO(gi, { footScale: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.footScale * 100)}%</span></label>
+                    <label className="flex items-center gap-2">VAT 크기<input type="range" min={0.6} max={1.8} step={0.05} value={o.vatScale} onChange={(e) => setO(gi, { vatScale: Number(e.target.value) })} className="flex-1 accent-taupe" disabled={!o.showVat} /><span className="w-9 text-right tabular-nums">{Math.round(o.vatScale * 100)}%</span></label>
+                    <div className="text-[10px] text-charcoal/40">미리보기에서 두 문구를 마우스로 끌어 옮길 수 있어요.</div>
+                  </div>
+
                   {o.showHeader && (
                     <div className="space-y-1">
                       <input value={o.headerPeriod} onChange={(e) => setO(gi, { headerPeriod: e.target.value })} placeholder="기간 (예: 2026.08.01~08.31)" className="w-full rounded border border-taupe/30 px-2 py-1" />
