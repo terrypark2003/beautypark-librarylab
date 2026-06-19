@@ -8,6 +8,7 @@ import { THEMES, THEME_LIST, themeKeyForGroup } from "../lib/themes";
 import { themeBg } from "../lib/backgrounds";
 import type { Sticker } from "../lib/poster";
 import { searchStock, stockToDataUrl, type StockPhoto } from "../lib/stock";
+import { searchIcons, iconToDataUrl, type IconResult } from "../lib/iconStickers";
 import { STICKER_SVGS, SVG_KEYS } from "../lib/stickerAssets";
 import { DESIGNED_SVGS, DESIGNED_KEYS, DESIGNED_LABELS } from "../lib/designedStickers";
 import { Poster } from "./Poster";
@@ -94,6 +95,12 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [stockResults, setStockResults] = useState<StockPhoto[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockNote, setStockNote] = useState<string | undefined>();
+  // 디자인 스티커 검색(Iconify)
+  const [iconGi, setIconGi] = useState<number | null>(null);
+  const [iconQ, setIconQ] = useState("");
+  const [iconResults, setIconResults] = useState<IconResult[]>([]);
+  const [iconLoading, setIconLoading] = useState(false);
+  const [iconNote, setIconNote] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -191,6 +198,20 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     } catch (e) { setStockNote(`적용 실패: ${(e as Error).message}`); }
     finally { setStockLoading(false); }
   }
+  async function runIcons() {
+    if (!iconQ.trim()) return;
+    setIconLoading(true);
+    const res = await searchIcons(iconQ.trim());
+    setIconResults(res.icons); setIconNote(res.note); setIconLoading(false);
+  }
+  async function pickIcon(it: IconResult) {
+    if (iconGi == null) return;
+    setIconLoading(true);
+    try { addSticker(iconGi, `img:${await iconToDataUrl(it.id)}`); setIconGi(null); }
+    catch (e) { setIconNote(`적용 실패: ${(e as Error).message}`); }
+    finally { setIconLoading(false); }
+  }
+
   useEffect(() => { if (initialData) { setData(initialData); setSource(`기획 · ${initialData.sheet}`); } }, [initialData]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -395,10 +416,13 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                       ))}
                     </div>
 
-                    <label className="mt-1.5 flex cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed border-taupe/50 bg-white px-2 py-1.5 text-[11px] text-taupe-deep hover:bg-taupe/5">
-                      🖼 누끼 / 이미지 업로드 (투명 PNG 권장)
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; addImageSticker(gi, f); e.target.value = ""; }} />
-                    </label>
+                    <div className="mt-1.5 flex gap-1.5">
+                      <button onClick={() => { setIconGi(gi); setIconResults([]); setIconNote(undefined); }} className="flex-1 rounded-md border border-taupe/40 bg-white px-2 py-1.5 text-[11px] font-medium text-taupe-deep hover:bg-taupe/10">🔎 디자인 스티커 검색</button>
+                      <label className="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed border-taupe/50 bg-white px-2 py-1.5 text-[11px] text-taupe-deep hover:bg-taupe/5">
+                        🖼 누끼 업로드
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; addImageSticker(gi, f); e.target.value = ""; }} />
+                      </label>
+                    </div>
 
                     <div className="mt-1.5 text-[10px] font-medium text-charcoal/45">기본 도형 · 이모지</div>
                     <div className="flex flex-wrap gap-1">
@@ -453,6 +477,33 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
               ))}
             </div>
             {stockResults.length === 0 && !stockLoading && <p className="py-8 text-center text-sm text-charcoal/40">검색어를 입력하고 Enter/검색. (무료: Openverse 기본 · Pexels 키 연결 시 고품질)</p>}
+          </div>
+        </div>
+      )}
+
+      {iconGi !== null && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setIconGi(null)}>
+          <div className="mt-10 w-full max-w-3xl rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <h3 className="font-serif text-lg text-taupe-deep">디자인 스티커 검색</h3>
+              <input value={iconQ} onChange={(e) => setIconQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runIcons()} placeholder="영문 키워드: flower, sparkle, gift, ribbon, heart, sun, star, crown…" className="min-w-[200px] flex-1 rounded-md border border-taupe/30 px-3 py-1.5 text-sm" />
+              <button onClick={runIcons} disabled={iconLoading} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep disabled:opacity-50">{iconLoading ? "…" : "검색"}</button>
+              <button onClick={() => setIconGi(null)} className="rounded-md border border-taupe/30 px-3 py-1.5 text-sm text-charcoal/70">닫기</button>
+            </div>
+            <div className="mb-2 flex flex-wrap gap-1">
+              {["flower", "sparkle", "heart", "gift", "ribbon", "sun", "star", "crown", "leaf", "balloon"].map((q) => (
+                <button key={q} onClick={() => { setIconQ(q); setIconLoading(true); searchIcons(q).then((r) => { setIconResults(r.icons); setIconNote(r.note); setIconLoading(false); }); }} className="rounded-full border border-taupe/30 px-2 py-0.5 text-[11px] text-charcoal/65 hover:bg-taupe/10">{q}</button>
+              ))}
+            </div>
+            {iconNote && <p className="mb-2 text-xs text-charcoal/50">{iconNote}</p>}
+            <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
+              {iconResults.map((it) => (
+                <button key={it.id} onClick={() => pickIcon(it)} title={it.id} className="flex aspect-square items-center justify-center rounded-md border border-taupe/15 p-1.5 hover:ring-2 hover:ring-taupe">
+                  <img src={it.thumb} alt="" loading="lazy" className="h-full w-full object-contain" />
+                </button>
+              ))}
+            </div>
+            {iconResults.length === 0 && !iconLoading && <p className="py-8 text-center text-sm text-charcoal/40">키워드를 입력해 검색하세요. 컬러 이모지·일러스트(무료) 수천 종에서 클릭해 스티커로 추가합니다.</p>}
           </div>
         </div>
       )}
