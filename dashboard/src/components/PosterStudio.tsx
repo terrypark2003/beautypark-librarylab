@@ -44,6 +44,7 @@ interface Opts {
   headerPeriod: string;
   headerTarget: string;
   showDiscount: boolean;
+  showPrice: boolean; // 가격 표시 ON/OFF
   nameSize: number; // 상품명 크기 배율
   nameWeight: number; // 상품명 굵기
   priceSize: number; // 금액 크기 배율
@@ -56,7 +57,7 @@ interface Opts {
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
-  showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false,
+  showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
   brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none",
 };
@@ -72,6 +73,7 @@ const SIZES = [
 const LAYOUTS = [
   { key: "classic", label: "기본" }, { key: "center", label: "센터" }, { key: "band", label: "밴드" },
   { key: "editorial", label: "에디토리얼" }, { key: "minimal", label: "미니멀" },
+  { key: "studio", label: "미니멀 에디토리얼" },
 ] as const;
 
 const PREVIEW_W = 330; // 세로형 미리보기 폭
@@ -332,7 +334,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       bgUrl: plate?.url, photoBg: !plate ? themeBg(themeFor(gi)) : undefined, hideTitle: plate?.hideTitle,
       logoScale: o.logoScale, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
-      showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount,
+      showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount, showPrice: o.showPrice,
       nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
       brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle, titleFx: o.titleFx,
       panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScale: L(gi).panelScale,
@@ -473,6 +475,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
 
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-1">정렬<select value={o.panelAlign} onChange={(e) => setO(gi, { panelAlign: e.target.value as any })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="left">좌</option><option value="center">중</option><option value="right">우</option></select></label>
+                    <label className="flex items-center gap-1"><input type="checkbox" checked={o.showPrice} onChange={(e) => setO(gi, { showPrice: e.target.checked })} className="accent-taupe" />가격</label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showDiscount} onChange={(e) => setO(gi, { showDiscount: e.target.checked })} className="accent-taupe" />할인율</label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showHeader} onChange={(e) => setO(gi, { showHeader: e.target.checked })} className="accent-taupe" />헤더바</label>
                   </div>
