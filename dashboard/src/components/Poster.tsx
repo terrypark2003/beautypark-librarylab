@@ -25,6 +25,7 @@ interface Props {
   width?: number;
   height?: number;
   logoScale?: number; // 로고 크기 배율
+  logoVariant?: "auto" | "color" | "white"; // 로고 색: 자동/유색/무색
   panelTop?: number; // 패널 상단 여백(em)
   panelBottom?: number; // 패널 하단 여백(em)
   panelWidth?: number; // 패널 좌우 너비(%)
@@ -82,7 +83,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, bgZoom = 1, bgDx = 0, bgDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [] }, ref) => {
+  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, logoVariant = "auto", panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, bgZoom = 1, bgDx = 0, bgDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [] }, ref) => {
     const theme = themeDef || THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -100,6 +101,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     const titleFamily = titleFont === "serif" ? '"Playfair Display", serif' : '"Pretendard Variable", Pretendard, sans-serif';
     const isStudio = variant === "studio";
     const headBox = variant !== "band" && !isStudio && !!headBg; // 색 지정 시 일반 레이아웃에도 타이틀 배경 박스
+    const logoSrc = logoVariant === "color" ? logoUrl : logoVariant === "white" ? (logoWhiteUrl || logoUrl) : (photo && logoWhiteUrl ? logoWhiteUrl : logoUrl);
 
     const styleVars = {
       ["--w" as any]: width,
@@ -151,7 +153,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
             <Spark cls="s3" />
             <div className="top">
               {logoUrl ? (
-                <img className="logo-img" data-drag="logo" style={logoDx || logoDy ? { transform: `translate(${logoDx}px, ${logoDy}px)` } : undefined} src={photo && logoWhiteUrl ? logoWhiteUrl : logoUrl} alt="BEAUTY PARK 뷰티파크의원 범어점" />
+                <img className="logo-img" data-drag="logo" style={logoDx || logoDy ? { transform: `translate(${logoDx}px, ${logoDy}px)` } : undefined} src={logoSrc} alt="BEAUTY PARK 뷰티파크의원 범어점" />
               ) : (
                 <div className="logo" data-drag="logo" style={logoDx || logoDy ? { transform: `translate(${logoDx}px, ${logoDy}px)` } : undefined}>
                   <div>
@@ -232,7 +234,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
         {showTitle && isStudio && (
           <div className="studio-brand">
             {logoUrl ? (
-              <img className="studio-logo" src={photo && logoWhiteUrl ? logoWhiteUrl : logoUrl} alt="BEAUTY PARK 뷰티파크의원 범어점" />
+              <img className="studio-logo" src={logoSrc} alt="BEAUTY PARK 뷰티파크의원 범어점" />
             ) : (
               <div className="studio-wm">
                 <div className="wm">BEAUTY PARK</div>

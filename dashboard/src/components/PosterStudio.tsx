@@ -36,6 +36,7 @@ const DEFAULT_LAYOUT: Layout = { panel: { dx: 0, dy: 0 }, logo: { dx: 0, dy: 0 }
 
 interface Opts {
   logoScale: number;
+  logoVariant: "auto" | "color" | "white"; // 로고 색: 자동/유색/무색(화이트)
   panelTop: number;
   panelBottom: number;
   panelWidth: number;
@@ -63,7 +64,7 @@ interface Opts {
   headBgOpacity: number; // 타이틀 배경 투명도(0~100)
 }
 const DEFAULT_OPTS: Opts = {
-  logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
+  logoScale: 1, logoVariant: "auto", panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
   showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true, showVat: true, footScale: 1, vatScale: 1,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
   brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1, headBg: "", headBgOpacity: 100,
@@ -116,7 +117,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [selSticker, setSelSticker] = useState<{ gi: number; id: string } | null>(null);
   const [titleOv, setTitleOv] = useState<Record<number, { l1?: string; l2?: string }>>({});
   const [titleEdit, setTitleEdit] = useState<number | null>(null); // 타이틀 편집 팝업 대상 gi
-  const [fxEdit, setFxEdit] = useState<{ gi: number; el: "foot" | "vat" } | null>(null); // 하단문구/VAT 편집 팝업
+  const [fxEdit, setFxEdit] = useState<{ gi: number; el: "foot" | "vat" | "logo" } | null>(null); // 로고/하단문구/VAT 편집 팝업
   // AI 테마(런타임 생성)
   const [aiThemes, setAiThemes] = useState<Record<string, ThemeDef>>({});
   const [aiGi, setAiGi] = useState<number | null>(null); // AI 테마 만들기 모달 대상 gi
@@ -206,12 +207,12 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     if (!tag) return;
     const scale = previewW / size.w;
     // 더블탭 → 편집 팝업 (드래그용 preventDefault가 네이티브 dblclick을 막으므로 수동 감지)
-    if (tag === "head" || tag === "foot" || tag === "vat") {
+    if (tag === "head" || tag === "foot" || tag === "vat" || tag === "logo") {
       const now = Date.now();
       const lt = lastTapRef.current;
       if (lt && lt.gi === gi && lt.tag === tag && now - lt.t < 350) {
         lastTapRef.current = null;
-        if (tag === "head") setTitleEdit(gi); else setFxEdit({ gi, el: tag as "foot" | "vat" });
+        if (tag === "head") setTitleEdit(gi); else setFxEdit({ gi, el: tag as "foot" | "vat" | "logo" });
         return;
       }
       lastTapRef.current = { gi, tag, t: now };
@@ -421,7 +422,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     return {
       group: data.groups[gi], themeKey: themeFor(gi), themeDef: resolveTheme(gi), sheet: data.sheet, width: size.w, height: size.h,
       bgUrl: plate?.url, photoBg: !plate ? themeBg(themeFor(gi)) : undefined, hideTitle: plate?.hideTitle,
-      logoScale: o.logoScale, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
+      logoScale: o.logoScale, logoVariant: o.logoVariant, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount, showPrice: o.showPrice,
       showVat: o.showVat, footScale: o.footScale, vatScale: o.vatScale,
@@ -698,21 +699,31 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       )}
 
       {fxEdit && (() => {
-        const gi = fxEdit.gi, o = O(gi), isFoot = fxEdit.el === "foot";
+        const gi = fxEdit.gi, o = O(gi), el = fxEdit.el;
+        const title = el === "logo" ? "로고" : el === "foot" ? "부가세 문구" : "VAT 별도";
+        const cur = el === "logo" ? o.logoScale : el === "foot" ? o.footScale : o.vatScale;
+        const setScale = (v: number) => setO(gi, el === "logo" ? { logoScale: v } : el === "foot" ? { footScale: v } : { vatScale: v });
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setFxEdit(null)}>
             <div className="mt-20 w-full max-w-xs rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-serif text-base text-taupe-deep">{isFoot ? "부가세 문구" : "VAT 별도"} 편집</h3>
+                <h3 className="font-serif text-base text-taupe-deep">{title} 편집</h3>
                 <button onClick={() => setFxEdit(null)} className="rounded-md border border-taupe/30 px-3 py-1 text-sm text-charcoal/70">닫기</button>
               </div>
               <div className="space-y-3 text-sm">
-                {!isFoot && (
+                {el === "vat" && (
                   <label className="flex items-center gap-2"><input type="checkbox" checked={o.showVat} onChange={(e) => setO(gi, { showVat: e.target.checked })} className="accent-taupe" />VAT 별도 표시</label>
                 )}
-                <label className="flex items-center gap-2">글자 크기
-                  <input type="range" min={0.6} max={1.8} step={0.05} value={isFoot ? o.footScale : o.vatScale} onChange={(e) => setO(gi, isFoot ? { footScale: Number(e.target.value) } : { vatScale: Number(e.target.value) })} className="flex-1 accent-taupe" disabled={!isFoot && !o.showVat} />
-                  <span className="w-10 text-right tabular-nums">{Math.round((isFoot ? o.footScale : o.vatScale) * 100)}%</span>
+                {el === "logo" && (
+                  <label className="flex items-center gap-2">색상
+                    <select value={o.logoVariant} onChange={(e) => setO(gi, { logoVariant: e.target.value as Opts["logoVariant"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
+                      <option value="auto">자동 (사진 위 흰색)</option><option value="color">유색 (컬러)</option><option value="white">무색 (화이트)</option>
+                    </select>
+                  </label>
+                )}
+                <label className="flex items-center gap-2">크기
+                  <input type="range" min={0.6} max={el === "logo" ? 3 : 1.8} step={0.05} value={cur} onChange={(e) => setScale(Number(e.target.value))} className="flex-1 accent-taupe" disabled={el === "vat" && !o.showVat} />
+                  <span className="w-10 text-right tabular-nums">{Math.round(cur * 100)}%</span>
                 </label>
                 <p className="text-[11px] text-charcoal/45">미리보기에서 끌어 위치도 옮길 수 있어요.</p>
                 <div className="flex justify-end"><button onClick={() => setFxEdit(null)} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep">완료</button></div>
