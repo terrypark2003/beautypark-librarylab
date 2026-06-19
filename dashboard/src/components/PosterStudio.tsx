@@ -59,12 +59,14 @@ interface Opts {
   titleFx: "none" | "shadow" | "lift" | "3d" | "outline" | "glow" | "gradient" | "gold" | "longshadow" | "emboss"; // 타이틀 글자 효과
   titleFont: "sans" | "serif"; // 제목 폰트
   titleScale: number; // 제목 크기 배율
+  headBg: string; // 타이틀 배경 색(빈칸=테마 기본). 밴드 레이아웃/색 지정 시 박스로 표시
+  headBgOpacity: number; // 타이틀 배경 투명도(0~100)
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
   showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true, showVat: true, footScale: 1, vatScale: 1,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
-  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1,
+  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1, headBg: "", headBgOpacity: 100,
 };
 
 const SIZES = [
@@ -379,7 +381,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       showVat: o.showVat, footScale: o.footScale, vatScale: o.vatScale,
       nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
       brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle,
-      titleFx: o.titleFx, titleFont: o.titleFont, titleScale: o.titleScale, l1Override: titleOv[gi]?.l1, l2Override: titleOv[gi]?.l2,
+      titleFx: o.titleFx, titleFont: o.titleFont, titleScale: o.titleScale, headBg: o.headBg, headBgOpacity: o.headBgOpacity, l1Override: titleOv[gi]?.l1, l2Override: titleOv[gi]?.l2,
       panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScaleX: L(gi).panelScaleX, panelScaleY: L(gi).panelScaleY,
       logoDx: L(gi).logo.dx, logoDy: L(gi).logo.dy, headDx: L(gi).head.dx, headDy: L(gi).head.dy,
       footDx: L(gi).foot.dx, footDy: L(gi).foot.dy, vatDx: L(gi).vat.dx, vatDy: L(gi).vat.dy,
@@ -680,8 +682,20 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   <input type="range" min={0.6} max={1.8} step={0.05} value={o.titleScale} onChange={(e) => setO(gi, { titleScale: Number(e.target.value) })} className="flex-1 accent-taupe" />
                   <span className="w-10 text-right tabular-nums">{Math.round(o.titleScale * 100)}%</span>
                 </label>
+                <div className="space-y-2 rounded border border-taupe/15 bg-ivory/50 p-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-charcoal/60">타이틀 배경</span>
+                    <input type="color" value={o.headBg || "#27408b"} onChange={(e) => setO(gi, { headBg: e.target.value })} className="h-6 w-9 cursor-pointer rounded border border-taupe/30" />
+                    <button onClick={() => setO(gi, { headBg: "" })} className="text-[11px] text-charcoal/55 hover:underline">테마색</button>
+                    <span className="ml-auto text-[10px] text-charcoal/40">밴드/색 지정 시 적용</span>
+                  </div>
+                  <label className="flex items-center gap-2">투명도
+                    <input type="range" min={0} max={100} step={1} value={o.headBgOpacity} onChange={(e) => setO(gi, { headBgOpacity: Number(e.target.value) })} className="flex-1 accent-taupe" />
+                    <span className="w-9 text-right tabular-nums">{o.headBgOpacity}%</span>
+                  </label>
+                </div>
                 <div className="flex items-center justify-between pt-1">
-                  <button onClick={() => { setTitleOv((m) => { const n = { ...m }; delete n[gi]; return n; }); setScripts((m) => { const n = { ...m }; delete n[gi]; return n; }); setO(gi, { titleFont: "sans", titleScale: 1, titleFx: "none" }); }} className="text-xs text-charcoal/55 hover:underline">기본값으로 되돌리기</button>
+                  <button onClick={() => { setTitleOv((m) => { const n = { ...m }; delete n[gi]; return n; }); setScripts((m) => { const n = { ...m }; delete n[gi]; return n; }); setO(gi, { titleFont: "sans", titleScale: 1, titleFx: "none", headBg: "", headBgOpacity: 100 }); }} className="text-xs text-charcoal/55 hover:underline">기본값으로 되돌리기</button>
                   <button onClick={() => setTitleEdit(null)} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep">완료</button>
                 </div>
               </div>

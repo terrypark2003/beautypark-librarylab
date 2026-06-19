@@ -48,6 +48,8 @@ interface Props {
   l2Override?: string; // 제목 2줄 직접 수정
   titleFont?: "sans" | "serif"; // 제목 폰트
   titleScale?: number; // 제목 크기 배율
+  headBg?: string; // 타이틀 배경 색(빈칸=테마 accent-deep)
+  headBgOpacity?: number; // 타이틀 배경 투명도(0~100)
   panelDx?: number; // 패널 가로 이동(px, 마우스 드래그)
   panelDy?: number; // 패널 세로 이동(px)
   panelScaleX?: number; // 패널 가로 크기 배율(우측 가장자리 드래그)
@@ -78,7 +80,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [] }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [] }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -95,6 +97,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     const L2 = l2Override !== undefined ? l2Override : h.l2;
     const titleFamily = titleFont === "serif" ? '"Playfair Display", serif' : '"Pretendard Variable", Pretendard, sans-serif';
     const isStudio = variant === "studio";
+    const headBox = variant !== "band" && !isStudio && !!headBg; // 색 지정 시 일반 레이아웃에도 타이틀 배경 박스
 
     const styleVars = {
       ["--w" as any]: width,
@@ -114,6 +117,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
       ["--vat-scale" as any]: vatScale,
       ["--panel-wscale" as any]: panelScaleX,
       ["--panel-hmax" as any]: panelScaleY,
+      ["--head-bg-alpha" as any]: headBgOpacity,
+      ...(headBg ? { ["--head-bg-color" as any]: headBg } : {}),
       ["--bg" as any]: t.bg,
       ["--blob" as any]: t.blob,
       ["--ink" as any]: t.ink,
@@ -166,7 +171,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
 
         <div className="body">
           {showTitle && (
-            <div className={`head${isStudio ? " studio-head" : ""}`} data-drag="head" style={headDx || headDy ? { transform: `translate(${headDx}px, ${headDy}px)` } : undefined}>
+            <div className={`head${isStudio ? " studio-head" : ""}${headBox ? " head-box" : ""}`} data-drag="head" style={headDx || headDy ? { transform: `translate(${headDx}px, ${headDy}px)` } : undefined}>
               {isStudio ? (
                 <>
                   <div className="hl-row">

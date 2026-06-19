@@ -94,7 +94,9 @@
 .poster.v-center .badge { margin-left: auto; margin-right: auto; }
 
 /* band: 타이틀을 컬러 밴드 안에 */
-.poster.v-band .head { background: var(--accent-deep); border-radius: .9em; padding: .9em 1em; }
+.poster.v-band .head { background: color-mix(in srgb, var(--head-bg-color, var(--accent-deep)) calc(var(--head-bg-alpha, 100) * 1%), transparent); border-radius: .9em; padding: .9em 1em; }
+/* 타이틀 배경 박스(밴드 외 레이아웃에서 색 지정 시) */
+.poster .head.head-box { background: color-mix(in srgb, var(--head-bg-color, var(--accent-deep)) calc(var(--head-bg-alpha, 100) * 1%), transparent); border-radius: .9em; padding: .8em 1em; }
 .poster.v-band .head .title, .poster.v-band .head .title .l2, .poster.v-band .head .sup { color: #fff !important; text-shadow: none; }
 .poster.v-band .head .script { color: rgba(255,255,255,.92) !important; }
 .poster.v-band.has-photo .head { box-shadow: 0 .4em 1.4em rgba(0,0,0,.25); }
