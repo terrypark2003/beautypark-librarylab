@@ -38,10 +38,15 @@ interface Opts {
   headerPeriod: string;
   headerTarget: string;
   showDiscount: boolean;
+  nameSize: number; // 상품명 크기 배율
+  nameWeight: number; // 상품명 굵기
+  priceSize: number; // 금액 크기 배율
+  priceFont: "serif" | "cormorant" | "sans"; // 금액 폰트
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
   showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false,
+  nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
 };
 
 const SIZES = [
@@ -57,7 +62,8 @@ const LAYOUTS = [
   { key: "editorial", label: "에디토리얼" }, { key: "minimal", label: "미니멀" },
 ] as const;
 
-const PREVIEW_W = 330;
+const PREVIEW_W = 330; // 세로형 미리보기 폭
+const PREVIEW_W_LAND = 760; // 가로형은 한 줄에 한 장씩 크게
 
 export default function PosterStudio({ initialData }: { initialData?: RequestData | null }) {
   const [data, setData] = useState<RequestData>(() => initialData ?? sampleData());
@@ -88,6 +94,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [cap, setCap] = useState<{ gi: number; name: string } | null>(null);
 
   const size = SIZES.find((s) => s.key === sizeKey)!;
+  const land = size.w > size.h; // 가로 팝업 등 가로형
+  const previewW = land ? PREVIEW_W_LAND : PREVIEW_W;
   const themeFor = (gi: number) => themes[gi] ?? themeKeyForGroup(data.groups[gi]?.group ?? "");
   const variantFor = (gi: number) => variants[gi] ?? LAYOUTS[gi % LAYOUTS.length].key;
   const defaultScript = (gi: number) => {
@@ -105,7 +113,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     const el = (e.target as HTMLElement).closest("[data-drag]") as HTMLElement | null;
     if (!el) return;
     const tag = el.getAttribute("data-drag")!;
-    const scale = PREVIEW_W / size.w;
+    const scale = previewW / size.w;
     if (tag.startsWith("s:")) {
       const id = tag.slice(2);
       const st = (stickers[gi] || []).find((s) => s.id === id);
@@ -232,8 +240,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     setBusy(false);
   }
 
-  const previewWrap = (w: number, h: number): React.CSSProperties => ({ width: PREVIEW_W, height: (PREVIEW_W * h) / w, overflow: "hidden", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,.12)" });
-  const previewInner: React.CSSProperties = { transform: `scale(${PREVIEW_W / size.w})`, transformOrigin: "top left" };
+  const previewWrap = (w: number, h: number): React.CSSProperties => ({ width: previewW, height: (previewW * h) / w, overflow: "hidden", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,.12)" });
+  const previewInner: React.CSSProperties = { transform: `scale(${previewW / size.w})`, transformOrigin: "top left" };
 
   const posterProps = (gi: number) => {
     const plate = plates[gi];
@@ -244,6 +252,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       logoScale: o.logoScale, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount,
+      nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
       panelDx: offsets[gi]?.dx || 0, panelDy: offsets[gi]?.dy || 0, stickers: stickers[gi] || [],
     };
   };
@@ -274,7 +283,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
-      <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-3">
+      <div className={land ? "grid justify-items-center gap-7 grid-cols-1" : "grid gap-7 md:grid-cols-2 xl:grid-cols-3"}>
         {data.groups.map((g, gi) => {
           const plate = plates[gi];
           const o = O(gi);
@@ -285,7 +294,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                 <div style={previewInner}><Poster {...posterProps(gi)} /></div>
               </div>
 
-              <div className="flex w-[330px] items-center gap-1.5">
+              <div className="flex items-center gap-1.5" style={{ width: previewW }}>
                 {!plate ? (
                   <select value={themeFor(gi)} onChange={(e) => setThemes((m) => ({ ...m, [gi]: e.target.value }))} className="min-w-0 flex-1 rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
                     {THEME_LIST.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
@@ -301,7 +310,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                 <button onClick={() => downloadOne(gi)} className="rounded-md bg-taupe px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-taupe-deep">PNG</button>
               </div>
 
-              <div className="flex w-[330px] items-center gap-2">
+              <div className="flex items-center gap-2" style={{ width: previewW }}>
                 <label className="flex-1 cursor-pointer rounded-md border border-dashed border-taupe/50 bg-white px-2 py-1.5 text-center text-xs text-taupe-deep hover:bg-taupe/5">
                   {plate ? "배경 변경" : "배경 업로드"}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => onPlate(gi, e.target.files?.[0])} />
@@ -312,17 +321,34 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                 <button onClick={() => setOpenOpts((m) => ({ ...m, [gi]: !m[gi] }))} className={`rounded-md border px-2 py-1.5 text-xs ${openOpts[gi] ? "border-taupe bg-taupe text-white" : "border-taupe/40 text-taupe-deep hover:bg-taupe/10"}`}>⚙</button>
               </div>
 
-              <div className="flex w-[330px] items-center gap-2">
+              <div className="flex items-center gap-2" style={{ width: previewW }}>
                 <span className="shrink-0 text-[11px] text-charcoal/50">✎ 영문태그</span>
                 <input value={scriptFor(gi)} onChange={(e) => setScripts((m) => ({ ...m, [gi]: e.target.value }))} placeholder="예: Early Summer (빈칸=숨김)" className="min-w-0 flex-1 rounded-md border border-taupe/30 px-2 py-1 text-xs" />
               </div>
 
               {openOpts[gi] && (
-                <div className="w-[330px] space-y-2 rounded-md border border-taupe/25 bg-ivory/60 p-3 text-[11px] text-charcoal/75">
+                <div className="space-y-2 rounded-md border border-taupe/25 bg-ivory/60 p-3 text-[11px] text-charcoal/75" style={{ width: previewW }}>
                   <label className="flex items-center gap-2">로고 크기<input type="range" min={0.6} max={3} step={0.05} value={o.logoScale} onChange={(e) => setO(gi, { logoScale: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.logoScale * 100)}%</span></label>
                   <label className="flex items-center gap-2">패널 상단<input type="range" min={0} max={14} step={0.5} value={o.panelTop} onChange={(e) => setO(gi, { panelTop: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelTop}</span></label>
                   <label className="flex items-center gap-2">패널 하단<input type="range" min={0} max={14} step={0.5} value={o.panelBottom} onChange={(e) => setO(gi, { panelBottom: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelBottom}</span></label>
                   <label className="flex items-center gap-2">패널 너비<input type="range" min={40} max={100} step={2} value={o.panelWidth} onChange={(e) => setO(gi, { panelWidth: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelWidth}%</span></label>
+
+                  <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
+                    <div className="font-medium text-charcoal/60">패널 글자 (하얀 박스 안)</div>
+                    <label className="flex items-center gap-2">상품명 크기<input type="range" min={0.7} max={1.5} step={0.05} value={o.nameSize} onChange={(e) => setO(gi, { nameSize: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.nameSize * 100)}%</span></label>
+                    <label className="flex items-center gap-2">상품명 굵기
+                      <select value={o.nameWeight} onChange={(e) => setO(gi, { nameWeight: Number(e.target.value) })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
+                        <option value={400}>가늘게</option><option value={600}>기본</option><option value={700}>굵게</option><option value={800}>더 굵게</option>
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2">금액 크기<input type="range" min={0.7} max={1.6} step={0.05} value={o.priceSize} onChange={(e) => setO(gi, { priceSize: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.priceSize * 100)}%</span></label>
+                    <label className="flex items-center gap-2">금액 폰트
+                      <select value={o.priceFont} onChange={(e) => setO(gi, { priceFont: e.target.value as Opts["priceFont"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
+                        <option value="serif">세리프(Playfair)</option><option value="cormorant">코모란트</option><option value="sans">산세리프</option>
+                      </select>
+                    </label>
+                  </div>
+
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-1">정렬<select value={o.panelAlign} onChange={(e) => setO(gi, { panelAlign: e.target.value as any })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="left">좌</option><option value="center">중</option><option value="right">우</option></select></label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showDiscount} onChange={(e) => setO(gi, { showDiscount: e.target.checked })} className="accent-taupe" />할인율</label>
