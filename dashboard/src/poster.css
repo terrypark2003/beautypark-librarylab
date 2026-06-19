@@ -20,8 +20,9 @@
   -webkit-mask-image: linear-gradient(180deg, #000, transparent 42%);
   mask-image: linear-gradient(180deg, #000, transparent 42%);
 }
-.poster .photo { position: absolute; inset: 0; background-position: center; background-size: cover; background-repeat: no-repeat; }
-.poster .scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(22,24,34,.42), rgba(22,24,34,.08) 30%, transparent 48%, transparent 64%, rgba(22,24,34,.16)); }
+.poster .photo { position: absolute; inset: 0; background-position: center; background-size: cover; background-repeat: no-repeat; transform-origin: center; }
+.poster .photo[data-drag] { cursor: grab; }
+.poster .scrim { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(22,24,34,.42), rgba(22,24,34,.08) 30%, transparent 48%, transparent 64%, rgba(22,24,34,.16)); }
 .poster .spk { position: absolute; fill: var(--accent); opacity: .42; }
 .poster .spk.s1 { top: 16%; right: 11%; width: 1.7em; height: 1.7em; }
 .poster .spk.s2 { top: 24%; right: 26%; width: 1em; height: 1em; opacity: .3; }

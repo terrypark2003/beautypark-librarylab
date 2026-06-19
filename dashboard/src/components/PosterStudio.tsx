@@ -31,8 +31,8 @@ const sanitize = (s: string) => s.replace(/[\\/:*?"<>|\n]/g, "").replace(/\s+/g,
 type Plate = { url: string; hideTitle: boolean };
 type XY = { dx: number; dy: number };
 // 마우스 드래그로 조절되는 포스터별 배치(패널/로고/타이틀/하단문구/VAT 이동 + 패널 가로·세로 크기)
-type Layout = { panel: XY; logo: XY; head: XY; foot: XY; vat: XY; panelScaleX: number; panelScaleY: number };
-const DEFAULT_LAYOUT: Layout = { panel: { dx: 0, dy: 0 }, logo: { dx: 0, dy: 0 }, head: { dx: 0, dy: 0 }, foot: { dx: 0, dy: 0 }, vat: { dx: 0, dy: 0 }, panelScaleX: 1, panelScaleY: 1 };
+type Layout = { panel: XY; logo: XY; head: XY; foot: XY; vat: XY; bg: XY; panelScaleX: number; panelScaleY: number; bgZoom: number };
+const DEFAULT_LAYOUT: Layout = { panel: { dx: 0, dy: 0 }, logo: { dx: 0, dy: 0 }, head: { dx: 0, dy: 0 }, foot: { dx: 0, dy: 0 }, vat: { dx: 0, dy: 0 }, bg: { dx: 0, dy: 0 }, panelScaleX: 1, panelScaleY: 1, bgZoom: 1 };
 
 interface Opts {
   logoScale: number;
@@ -201,8 +201,9 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   // 마우스 드래그(패널/로고/타이틀 이동 · 패널 크기 · 스티커 이동)
   function onDragStart(gi: number, e: React.PointerEvent) {
     const el = (e.target as HTMLElement).closest("[data-drag]") as HTMLElement | null;
-    if (!el) return;
-    const tag = el.getAttribute("data-drag")!;
+    // 빈 영역 클릭 → 배경 이동(배경 사진이 있을 때만)
+    const tag = el ? el.getAttribute("data-drag")! : ((plates[gi] || themeBg(themeFor(gi))) ? "bg" : null);
+    if (!tag) return;
     const scale = previewW / size.w;
     // 더블탭 → 편집 팝업 (드래그용 preventDefault가 네이티브 dblclick을 막으므로 수동 감지)
     if (tag === "head" || tag === "foot" || tag === "vat") {
@@ -430,6 +431,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScaleX: L(gi).panelScaleX, panelScaleY: L(gi).panelScaleY,
       logoDx: L(gi).logo.dx, logoDy: L(gi).logo.dy, headDx: L(gi).head.dx, headDy: L(gi).head.dy,
       footDx: L(gi).foot.dx, footDy: L(gi).foot.dy, vatDx: L(gi).vat.dx, vatDy: L(gi).vat.dy,
+      bgDx: L(gi).bg.dx, bgDy: L(gi).bg.dy, bgZoom: L(gi).bgZoom,
       stickers: stickers[gi] || [],
     };
   };
@@ -529,6 +531,14 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   <label className="flex items-center gap-2">패널 상단<input type="range" min={0} max={14} step={0.5} value={o.panelTop} onChange={(e) => setO(gi, { panelTop: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelTop}</span></label>
                   <label className="flex items-center gap-2">패널 하단<input type="range" min={0} max={14} step={0.5} value={o.panelBottom} onChange={(e) => setO(gi, { panelBottom: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelBottom}</span></label>
                   <label className="flex items-center gap-2">패널 너비<input type="range" min={40} max={100} step={2} value={o.panelWidth} onChange={(e) => setO(gi, { panelWidth: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelWidth}%</span></label>
+
+                  {(plates[gi] || themeBg(themeFor(gi))) && (
+                    <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
+                      <div className="font-medium text-charcoal/60">배경 사진</div>
+                      <label className="flex items-center gap-2">확대<input type="range" min={1} max={3} step={0.02} value={L(gi).bgZoom} onChange={(e) => setL(gi, { bgZoom: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(L(gi).bgZoom * 100)}%</span></label>
+                      <div className="text-[10px] text-charcoal/40">미리보기에서 배경(빈 영역)을 끌어 위치를 옮기세요. 고해상도 사진은 부분 확대해도 또렷합니다.</div>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
                     <div className="font-medium text-charcoal/60">패널 글자 (하얀 박스 안)</div>

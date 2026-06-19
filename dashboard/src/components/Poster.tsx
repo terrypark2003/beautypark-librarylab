@@ -57,6 +57,7 @@ interface Props {
   panelScaleY?: number; // 패널 세로 크기 배율(하단 가장자리 드래그)
   logoDx?: number; logoDy?: number; // 로고 이동(드래그)
   headDx?: number; headDy?: number; // 타이틀(헤드라인) 이동(드래그)
+  bgZoom?: number; bgDx?: number; bgDy?: number; // 배경 사진 확대/이동(부분 확대 크롭)
   showVat?: boolean; // 우하단 'VAT 별도' 표시
   footDx?: number; footDy?: number; footScale?: number; // 하단 안내문구 이동/크기
   vatDx?: number; vatDy?: number; vatScale?: number; // VAT 배지 이동/크기
@@ -81,7 +82,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [] }, ref) => {
+  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, bgZoom = 1, bgDx = 0, bgDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [] }, ref) => {
     const theme = themeDef || THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -134,7 +135,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     return (
       <div ref={ref} className={`poster v-${variant}${photo ? " has-photo" : ""}${land ? " land" : ""}${titleFx && titleFx !== "none" ? ` fx-${titleFx}` : ""}`} style={styleVars}>
         {photo ? (
-          <div className="photo" style={{ backgroundImage: `url(${photo})` }} />
+          <div className="photo" data-drag="bg" style={{ backgroundImage: `url(${photo})`, transform: bgDx || bgDy || bgZoom !== 1 ? `translate(${bgDx}px, ${bgDy}px) scale(${bgZoom})` : undefined }} />
         ) : (
           <>
             <div className="blob" />
