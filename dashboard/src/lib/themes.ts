@@ -103,7 +103,52 @@ export const THEMES: Record<string, ThemeDef> = {
     },
     headline: (g) => ({ script: "Half-year Best", ...splitName(g) }),
   },
+  noir: {
+    key: "noir", label: "럭셔리 블랙 (느와르)",
+    tokens: { bg: "linear-gradient(160deg,#15161A 0%,#1E2026 55%,#26282F 100%)", blob: "radial-gradient(55% 40% at 80% 8%, rgba(212,184,124,.28), transparent 65%)", ink: "#EDE7DA", accent: "#C9A86A", accentDeep: "#E0C485", script: "#C9A86A", panel: "rgba(255,255,255,.96)", divider: "#ECE6DA", was: "#9A948A" },
+    headline: (g) => ({ script: "Signature", ...splitName(g) }),
+  },
+  ivoryclean: {
+    key: "ivoryclean", label: "클린 화이트 (미니멀)",
+    tokens: { bg: "linear-gradient(160deg,#FFFFFF 0%,#F6F6F4 100%)", blob: "radial-gradient(50% 38% at 82% 8%, rgba(170,170,170,.16), transparent 65%)", ink: "#2B2B2E", accent: "#8A8A8F", accentDeep: "#55555A", script: "#A99B8C", panel: "rgba(255,255,255,.98)", divider: "#EEEEEC", was: "#BDBDBD" },
+    headline: (g) => ({ script: "Clean", ...splitName(g) }),
+  },
+  pastel: {
+    key: "pastel", label: "파스텔 (로즈·라벤더)",
+    tokens: { bg: "linear-gradient(160deg,#FBEFF4 0%,#F1E8F7 55%,#E7EAF8 100%)", blob: "radial-gradient(55% 40% at 80% 8%, rgba(255,255,255,.7), transparent 65%)", ink: "#4A3A48", accent: "#C58AB0", accentDeep: "#A85F96", script: "#CFA0C4", panel: "rgba(255,255,255,.97)", divider: "#F1E8EE", was: "#C4B6BF" },
+    headline: (g) => ({ script: "Soft Glow", ...splitName(g) }),
+  },
+  medical: {
+    key: "medical", label: "메디컬 블루 (클리닉)",
+    tokens: { bg: "linear-gradient(160deg,#F2F8FB 0%,#E3F0F7 100%)", blob: "radial-gradient(55% 40% at 82% 6%, rgba(255,255,255,.7), transparent 65%)", ink: "#1E3A47", accent: "#2E8FB0", accentDeep: "#1C6E8C", script: "#5FB4CE", panel: "rgba(255,255,255,.98)", divider: "#E4EFF4", was: "#A6B8C0" },
+    headline: (g) => ({ script: "Clinic Care", ...splitName(g) }),
+  },
+  mono: {
+    key: "mono", label: "모노톤 (차콜)",
+    tokens: { bg: "linear-gradient(160deg,#ECECEC 0%,#DCDCDC 100%)", blob: "radial-gradient(50% 38% at 82% 8%, rgba(0,0,0,.06), transparent 65%)", ink: "#222226", accent: "#5A5A5F", accentDeep: "#2E2E33", script: "#8A8A8F", panel: "rgba(255,255,255,.98)", divider: "#E2E2E2", was: "#ABABAB" },
+    headline: (g) => ({ script: "Editorial", ...splitName(g) }),
+  },
+  nature: {
+    key: "nature", label: "네이처 (베이지·올리브)",
+    tokens: { bg: "linear-gradient(160deg,#F6F3EA 0%,#ECE6D6 55%,#E0DCC4 100%)", blob: "radial-gradient(55% 40% at 80% 8%, rgba(150,160,110,.22), transparent 65%)", ink: "#3B3A2E", accent: "#8E8A5E", accentDeep: "#6B6A42", script: "#A99B6E", panel: "rgba(255,255,255,.96)", divider: "#ECE7D8", was: "#B7B19A" },
+    headline: (g) => ({ script: "Natural", ...splitName(g) }),
+  },
+  rose: {
+    key: "rose", label: "로즈 골드 (웜)",
+    tokens: { bg: "linear-gradient(160deg,#FBF0EC 0%,#F6E2DA 55%,#EFD0C6 100%)", blob: "radial-gradient(55% 40% at 80% 8%, rgba(255,255,255,.6), transparent 65%)", ink: "#4B362F", accent: "#C08A6E", accentDeep: "#A56A4E", script: "#CDA07F", panel: "rgba(255,255,255,.97)", divider: "#F1E4DD", was: "#C6B3A9" },
+    headline: (g) => ({ script: "Rosé", ...splitName(g) }),
+  },
+  sunset: {
+    key: "sunset", label: "선셋 (코랄·피치)",
+    tokens: { bg: "linear-gradient(160deg,#FFF1E6 0%,#FFE0D0 50%,#FBC9C0 100%)", blob: "radial-gradient(55% 40% at 80% 8%, rgba(255,255,255,.6), transparent 65%)", ink: "#4E2F2A", accent: "#E0795C", accentDeep: "#C85A3E", script: "#F0A088", panel: "rgba(255,255,255,.97)", divider: "#F7E2D8", was: "#D2B3A8" },
+    headline: (g) => ({ script: "Sunset", ...splitName(g) }),
+  },
 };
+
+// AI/런타임 생성 테마용 — 색 토큰 + 영문 태그로 ThemeDef 구성
+export function makeTheme(key: string, label: string, tokens: ThemeTokens, scriptTag = ""): ThemeDef {
+  return { key, label, tokens, headline: (g) => ({ script: scriptTag || undefined, ...splitName(g) }) };
+}
 
 export function themeKeyForGroup(name: string): string {
   const n = name.replace(/\s/g, "");

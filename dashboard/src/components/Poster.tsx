@@ -1,6 +1,6 @@
 import { forwardRef } from "react";
 import type { EventGroup } from "../lib/types";
-import { THEMES } from "../lib/themes";
+import { THEMES, type ThemeDef } from "../lib/themes";
 import { manwon, eventPrice, normalPrice, validItems, type Sticker } from "../lib/poster";
 import { STICKER_SVGS } from "../lib/stickerAssets";
 import { DESIGNED_SVGS } from "../lib/designedStickers";
@@ -17,6 +17,7 @@ const Spark = ({ cls }: { cls: string }) => (
 interface Props {
   group: EventGroup;
   themeKey: string;
+  themeDef?: ThemeDef; // 런타임/AI 테마(있으면 themeKey 대신 사용)
   sheet: string;
   bgUrl?: string | null; // 업로드 배경
   photoBg?: string | null; // 테마 배경
@@ -80,8 +81,8 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [] }, ref) => {
-    const theme = THEMES[themeKey] || THEMES.summer;
+  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [] }, ref) => {
+    const theme = themeDef || THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
     const h = theme.headline(group);

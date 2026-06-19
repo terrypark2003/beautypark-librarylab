@@ -4,7 +4,7 @@ import { toPng } from "html-to-image";
 import type { RequestData } from "../lib/types";
 import { sampleData } from "../lib/sample";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
-import { THEMES, THEME_LIST, themeKeyForGroup } from "../lib/themes";
+import { THEMES, THEME_LIST, themeKeyForGroup, makeTheme, type ThemeDef } from "../lib/themes";
 import { themeBg } from "../lib/backgrounds";
 import type { Sticker } from "../lib/poster";
 import { searchStock, stockToDataUrl, type StockPhoto } from "../lib/stock";
@@ -116,6 +116,12 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [selSticker, setSelSticker] = useState<{ gi: number; id: string } | null>(null);
   const [titleOv, setTitleOv] = useState<Record<number, { l1?: string; l2?: string }>>({});
   const [titleEdit, setTitleEdit] = useState<number | null>(null); // 타이틀 편집 팝업 대상 gi
+  // AI 테마(런타임 생성)
+  const [aiThemes, setAiThemes] = useState<Record<string, ThemeDef>>({});
+  const [aiGi, setAiGi] = useState<number | null>(null); // AI 테마 만들기 모달 대상 gi
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiNote, setAiNote] = useState<string | undefined>();
   const dragRef = useRef<{ gi: number; tag: string; sx: number; sy: number; scale: number; base: any } | null>(null);
   const [sizeKey, setSizeKey] = useState<string>("portrait");
   // 스톡 사진 검색
@@ -149,10 +155,28 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     return g ? (THEMES[themeFor(gi)] || THEMES.summer).headline(g).script ?? "" : "";
   };
   const scriptFor = (gi: number) => (scripts[gi] !== undefined ? scripts[gi] : defaultScript(gi));
+  const resolveTheme = (gi: number): ThemeDef | undefined => aiThemes[themeFor(gi)]; // AI 테마면 정의 반환, 기본 테마는 undefined(키로 처리)
+  const themeOptions = [...THEME_LIST, ...Object.values(aiThemes).map((t) => ({ key: t.key, label: t.label }))];
+  async function genAiTheme() {
+    if (aiGi == null || !aiPrompt.trim()) return;
+    setAiLoading(true); setAiNote(undefined);
+    try {
+      const r = await fetch("/api/palette", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: aiPrompt.trim() }) });
+      const d = await r.json().catch(() => ({}));
+      if (!d.palette) { setAiNote(d.note || `생성 실패 (${r.status})`); return; }
+      const p = d.palette;
+      const key = `ai_${uid()}`;
+      const theme = makeTheme(key, `✨ ${p.label}`, { bg: p.bg, blob: p.blob, ink: p.ink, accent: p.accent, accentDeep: p.accentDeep, script: p.scriptColor, panel: p.panel, divider: p.divider, was: p.was }, p.tag);
+      setAiThemes((m) => ({ ...m, [key]: theme }));
+      setThemes((m) => ({ ...m, [aiGi]: key }));
+      setAiGi(null); setAiPrompt("");
+    } catch (e) { setAiNote(`오류: ${(e as Error).message}`); }
+    finally { setAiLoading(false); }
+  }
   const O = (gi: number): Opts => ({ ...DEFAULT_OPTS, ...(opts[gi] || {}) });
   const setO = (gi: number, patch: Partial<Opts>) => setOpts((m) => ({ ...m, [gi]: { ...DEFAULT_OPTS, ...(m[gi] || {}), ...patch } }));
 
-  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setLayouts({}); setStickers({}); setSelSticker(null); setTitleOv({}); setTitleEdit(null); }, [data]);
+  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setLayouts({}); setStickers({}); setSelSticker(null); setTitleOv({}); setTitleEdit(null); setAiThemes({}); setAiGi(null); }, [data]);
   const L = (gi: number): Layout => ({ ...DEFAULT_LAYOUT, ...(layouts[gi] || {}) });
   const setL = (gi: number, patch: Partial<Layout>) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT, ...(m[gi] || {}), ...patch } }));
   const lastTapRef = useRef<{ gi: number; t: number } | null>(null); // 타이틀 더블탭 감지용
@@ -373,7 +397,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     const plate = plates[gi];
     const o = O(gi);
     return {
-      group: data.groups[gi], themeKey: themeFor(gi), sheet: data.sheet, width: size.w, height: size.h,
+      group: data.groups[gi], themeKey: themeFor(gi), themeDef: resolveTheme(gi), sheet: data.sheet, width: size.w, height: size.h,
       bgUrl: plate?.url, photoBg: !plate ? themeBg(themeFor(gi)) : undefined, hideTitle: plate?.hideTitle,
       logoScale: o.logoScale, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
@@ -438,9 +462,12 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
 
               <div className="flex items-center gap-1.5" style={{ width: previewW }}>
                 {!plate ? (
-                  <select value={themeFor(gi)} onChange={(e) => setThemes((m) => ({ ...m, [gi]: e.target.value }))} className="min-w-0 flex-1 rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
-                    {THEME_LIST.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-                  </select>
+                  <>
+                    <select value={themeFor(gi)} onChange={(e) => setThemes((m) => ({ ...m, [gi]: e.target.value }))} className="min-w-0 flex-1 rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
+                      {themeOptions.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                    </select>
+                    <button onClick={() => { setAiGi(gi); setAiPrompt(""); setAiNote(undefined); }} title="AI로 테마 색 만들기" className="shrink-0 rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-taupe-deep hover:bg-taupe/10">✨AI</button>
+                  </>
                 ) : (
                   <label className="flex min-w-0 flex-1 items-center gap-1 rounded-md border border-taupe/30 bg-white px-1.5 py-1.5 text-xs text-charcoal/75">
                     <input type="checkbox" checked={plate.hideTitle} onChange={() => toggleHide(gi)} className="accent-taupe" />타이틀 숨김
@@ -635,6 +662,28 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
               ))}
             </div>
             {iconResults.length === 0 && !iconLoading && <p className="py-8 text-center text-sm text-charcoal/40">키워드를 입력해 검색하세요. 컬러 이모지·일러스트(무료) 수천 종에서 클릭해 스티커로 추가합니다.</p>}
+          </div>
+        </div>
+      )}
+
+      {aiGi !== null && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setAiGi(null)}>
+          <div className="mt-16 w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="font-serif text-lg text-taupe-deep">✨ AI 테마 만들기</h3>
+              <button onClick={() => setAiGi(null)} className="rounded-md border border-taupe/30 px-3 py-1 text-sm text-charcoal/70">닫기</button>
+            </div>
+            <p className="mb-2 text-xs text-charcoal/55">원하는 분위기를 적으면 AI가 색 조합(테마)을 만들어 이 포스터에 적용하고 목록에 추가합니다.</p>
+            <div className="mb-2 flex flex-wrap gap-1">
+              {["고급스러운 가을 버건디", "청량한 여름 민트", "우아한 로즈골드", "미니멀 모노톤", "따뜻한 베이지 내추럴", "프리미엄 네이비 골드"].map((q) => (
+                <button key={q} onClick={() => setAiPrompt(q)} className="rounded-full border border-taupe/30 px-2 py-0.5 text-[11px] text-charcoal/65 hover:bg-taupe/10">{q}</button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && genAiTheme()} placeholder="예: 고급스러운 가을 버건디 느낌" className="min-w-0 flex-1 rounded-md border border-taupe/30 px-3 py-1.5 text-sm" />
+              <button onClick={genAiTheme} disabled={aiLoading || !aiPrompt.trim()} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep disabled:opacity-50">{aiLoading ? "생성 중…" : "생성"}</button>
+            </div>
+            {aiNote && <p className="mt-2 text-xs text-charcoal/50">{aiNote}</p>}
           </div>
         </div>
       )}
