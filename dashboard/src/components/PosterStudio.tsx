@@ -73,6 +73,8 @@ const SIZES = [
   { key: "pop169", label: "홈팝업 16:9 (2400×1350)", w: 2400, h: 1350 },
   { key: "pop34", label: "홈팝업 3:4 (1120×1492)", w: 1120, h: 1492 },
   { key: "popA4", label: "홈팝업 A4 (1240×1754)", w: 1240, h: 1754 },
+  { key: "promoThumb", label: "기획전 썸네일 (1080×540)", w: 1080, h: 540 },
+  { key: "promoGuide", label: "기획전 안내용 (960×1280)", w: 960, h: 1280 },
 ] as const;
 
 const LAYOUTS = [
@@ -275,8 +277,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         await new Promise((r) => setTimeout(r, 150));
         const node = captureRef.current;
         if (node && !cancelled) {
-          // 캔바 전송은 원본 사이즈(서버리스 본문 한도), 홈팝업은 권장 해상도 그대로(정확히), 그 외는 2배(대형은 1.5배)
-          const exact = toCanva || sizeKey.startsWith("pop");
+          // 캔바 전송은 원본 사이즈(서버리스 본문 한도), 홈팝업·기획전은 권장 해상도 그대로(정확히), 그 외는 2배(대형은 1.5배)
+          const exact = toCanva || sizeKey.startsWith("pop") || sizeKey.startsWith("promo");
           const pr = exact ? 1 : size.w >= 1600 ? 1.5 : 2;
           const url = await toPng(node, { pixelRatio: pr, width: size.w, height: size.h, cacheBust: true });
           if (toCanva) await sendToCanva(cap.gi, url);
