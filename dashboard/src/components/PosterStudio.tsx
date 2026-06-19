@@ -68,6 +68,11 @@ const SIZES = [
   { key: "square", label: "인스타 1:1 (1080×1080)", w: 1080, h: 1080 },
   { key: "story", label: "스토리 9:16 (1080×1920)", w: 1080, h: 1920 },
   { key: "wide", label: "가로 팝업 16:9 (1200×675)", w: 1200, h: 675 },
+  { key: "pop11", label: "홈팝업 1:1 (1280×1280)", w: 1280, h: 1280 },
+  { key: "pop43", label: "홈팝업 4:3 (1704×1280)", w: 1704, h: 1280 },
+  { key: "pop169", label: "홈팝업 16:9 (2400×1350)", w: 2400, h: 1350 },
+  { key: "pop34", label: "홈팝업 3:4 (1120×1492)", w: 1120, h: 1492 },
+  { key: "popA4", label: "홈팝업 A4 (1240×1754)", w: 1240, h: 1754 },
 ] as const;
 
 const LAYOUTS = [
@@ -270,8 +275,10 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         await new Promise((r) => setTimeout(r, 150));
         const node = captureRef.current;
         if (node && !cancelled) {
-          // 캔바 전송은 원본 사이즈(pixelRatio 1) — 서버리스 본문 한도(4.5MB)와 캔바 디자인 크기에 맞춤
-          const url = await toPng(node, { pixelRatio: toCanva ? 1 : size.w >= 1600 ? 1.5 : 2, width: size.w, height: size.h, cacheBust: true });
+          // 캔바 전송은 원본 사이즈(서버리스 본문 한도), 홈팝업은 권장 해상도 그대로(정확히), 그 외는 2배(대형은 1.5배)
+          const exact = toCanva || sizeKey.startsWith("pop");
+          const pr = exact ? 1 : size.w >= 1600 ? 1.5 : 2;
+          const url = await toPng(node, { pixelRatio: pr, width: size.w, height: size.h, cacheBust: true });
           if (toCanva) await sendToCanva(cap.gi, url);
           else { const a = document.createElement("a"); a.href = url; a.download = cap.name; a.click(); }
         }
