@@ -8,7 +8,9 @@ import { THEMES, THEME_LIST, themeKeyForGroup } from "../lib/themes";
 import { themeBg } from "../lib/backgrounds";
 import type { Sticker } from "../lib/poster";
 import { searchStock, stockToDataUrl, type StockPhoto } from "../lib/stock";
+import { searchIcons, iconToDataUrl, type IconResult } from "../lib/iconStickers";
 import { STICKER_SVGS, SVG_KEYS } from "../lib/stickerAssets";
+import { DESIGNED_SVGS, DESIGNED_KEYS, DESIGNED_LABELS } from "../lib/designedStickers";
 import { Poster } from "./Poster";
 
 const THEME_QUERY: Record<string, string> = {
@@ -42,11 +44,16 @@ interface Opts {
   nameWeight: number; // 상품명 굵기
   priceSize: number; // 금액 크기 배율
   priceFont: "serif" | "cormorant" | "sans"; // 금액 폰트
+  brandTop: string; // 우상단 윗줄(빈칸=기본 EVENT · 월)
+  brandSub: string; // 우상단 아랫줄
+  brandFont: "sans" | "serif"; // 우상단 폰트
+  brandStyle: "stack" | "line" | "hidden"; // 우상단 형식
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
   showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
+  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack",
 };
 
 const SIZES = [
@@ -88,10 +95,20 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [stockResults, setStockResults] = useState<StockPhoto[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockNote, setStockNote] = useState<string | undefined>();
+  // 디자인 스티커 검색(Iconify)
+  const [iconGi, setIconGi] = useState<number | null>(null);
+  const [iconQ, setIconQ] = useState("");
+  const [iconResults, setIconResults] = useState<IconResult[]>([]);
+  const [iconLoading, setIconLoading] = useState(false);
+  const [iconNote, setIconNote] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
-  const [cap, setCap] = useState<{ gi: number; name: string } | null>(null);
+  const [cap, setCap] = useState<{ gi: number; name: string; action: "download" | "canva" } | null>(null);
+  // 캔바 연동
+  const [canva, setCanva] = useState<{ configured: boolean; connected: boolean; name?: string } | null>(null);
+  const [canvaBusy, setCanvaBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const size = SIZES.find((s) => s.key === sizeKey)!;
   const land = size.w > size.h; // 가로 팝업 등 가로형
@@ -143,10 +160,16 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const onDragEnd = () => { dragRef.current = null; };
 
   const addSticker = (gi: number, char: string, badge = false) => {
-    const size = char.startsWith("svg:") ? 4 : badge ? 1.5 : 2.6;
+    const size = char.startsWith("img:") ? 7 : char.startsWith("svg:") ? 4.5 : badge ? 1.5 : 2.6;
     const s: Sticker = { id: uid(), char, x: 50, y: 40, size, rot: 0, badge };
     setStickers((m) => ({ ...m, [gi]: [...(m[gi] || []), s] }));
     setSelSticker({ gi, id: s.id });
+  };
+  const addImageSticker = (gi: number, file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => addSticker(gi, `img:${String(reader.result)}`);
+    reader.readAsDataURL(file);
   };
   async function applyThemePhoto(gi: number) {
     const res = await searchStock(THEME_QUERY[themeFor(gi)] || "aesthetic minimal background", size.w > size.h ? "landscape" : "portrait");
@@ -179,6 +202,20 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     } catch (e) { setStockNote(`적용 실패: ${(e as Error).message}`); }
     finally { setStockLoading(false); }
   }
+  async function runIcons() {
+    if (!iconQ.trim()) return;
+    setIconLoading(true);
+    const res = await searchIcons(iconQ.trim());
+    setIconResults(res.icons); setIconNote(res.note); setIconLoading(false);
+  }
+  async function pickIcon(it: IconResult) {
+    if (iconGi == null) return;
+    setIconLoading(true);
+    try { addSticker(iconGi, `img:${await iconToDataUrl(it.id)}`); setIconGi(null); }
+    catch (e) { setIconNote(`적용 실패: ${(e as Error).message}`); }
+    finally { setIconLoading(false); }
+  }
+
   useEffect(() => { if (initialData) { setData(initialData); setSource(`기획 · ${initialData.sheet}`); } }, [initialData]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -210,28 +247,58 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   useEffect(() => {
     if (!cap) return;
     let cancelled = false;
+    const toCanva = cap.action === "canva";
     (async () => {
       try {
         await (document as any).fonts?.ready;
         await new Promise((r) => setTimeout(r, 150));
         const node = captureRef.current;
         if (node && !cancelled) {
-          const url = await toPng(node, { pixelRatio: size.w >= 1600 ? 1.5 : 2, width: size.w, height: size.h, cacheBust: true });
-          const a = document.createElement("a"); a.href = url; a.download = cap.name; a.click();
+          // 캔바 전송은 원본 사이즈(pixelRatio 1) — 서버리스 본문 한도(4.5MB)와 캔바 디자인 크기에 맞춤
+          const url = await toPng(node, { pixelRatio: toCanva ? 1 : size.w >= 1600 ? 1.5 : 2, width: size.w, height: size.h, cacheBust: true });
+          if (toCanva) await sendToCanva(cap.gi, url);
+          else { const a = document.createElement("a"); a.href = url; a.download = cap.name; a.click(); }
         }
-      } catch (e) { setError(`PNG 생성 실패: ${(e as Error).message}`); }
-      finally { if (!cancelled) setCap(null); }
+      } catch (e) { setError(`${toCanva ? "캔바 전송" : "PNG 생성"} 실패: ${(e as Error).message}`); }
+      finally { if (!cancelled) { setCap(null); if (toCanva) setCanvaBusy(false); } }
     })();
     return () => { cancelled = true; };
   }, [cap, size.w, size.h]);
 
+  // 캔바 연결 상태 조회 + 콜백 복귀 처리
+  const refreshCanva = () => fetch("/api/canva/status").then((r) => r.json()).then(setCanva).catch(() => {});
+  useEffect(() => { refreshCanva(); }, []);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const c = p.get("canva");
+    if (!c) return;
+    if (c === "connected") { setNotice("캔바 계정이 연결되었습니다 ✓"); refreshCanva(); }
+    else setError(`캔바 연결 실패: ${p.get("msg") || ""}`);
+    p.delete("canva"); p.delete("msg");
+    const qs = p.toString();
+    window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+  }, []);
+
+  async function sendToCanva(gi: number, dataUrl: string) {
+    const r = await fetch("/api/canva/export", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageDataUrl: dataUrl, title: `뷰티파크 ${data.sheet} ${data.groups[gi].group}`, width: size.w, height: size.h }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.editUrl) throw new Error(d.error || `export ${r.status}`);
+    setNotice("캔바에 디자인을 만들었어요. 새 탭에서 편집하세요 ✓");
+    window.open(d.editUrl, "_blank");
+  }
+  const exportCanva = (gi: number) => { setError(null); setNotice(null); setCanvaBusy(true); setCap({ gi, name: fileName(gi), action: "canva" }); };
+  async function canvaLogout() { await fetch("/api/canva/logout", { method: "POST" }).catch(() => {}); refreshCanva(); }
+
   const fileName = (gi: number) => `뷰티파크_${data.sheet}_${sanitize(data.groups[gi].group)}_${sizeKey}.png`;
-  const downloadOne = (gi: number) => setCap({ gi, name: fileName(gi) });
+  const downloadOne = (gi: number) => setCap({ gi, name: fileName(gi), action: "download" });
   async function downloadAll() {
     setBusy(true);
     for (let gi = 0; gi < data.groups.length; gi++) {
       await new Promise<void>((resolve) => {
-        setCap({ gi, name: fileName(gi) });
+        setCap({ gi, name: fileName(gi), action: "download" });
         const iv = setInterval(() => { if (captureRef.current === null) { clearInterval(iv); resolve(); } }, 50);
         setTimeout(() => { clearInterval(iv); resolve(); }, 3000);
       });
@@ -253,6 +320,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount,
       nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
+      brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle,
       panelDx: offsets[gi]?.dx || 0, panelDy: offsets[gi]?.dy || 0, stickers: stickers[gi] || [],
     };
   };
@@ -277,10 +345,19 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
             <input ref={fileRef} type="file" accept=".xlsx" onChange={onFile} className="hidden" />
             <button onClick={() => fileRef.current?.click()} className="rounded-md bg-taupe px-4 py-2 text-sm font-semibold text-white transition hover:bg-taupe-deep">엑셀 업로드</button>
             <button onClick={downloadAll} disabled={busy} className="rounded-md border border-taupe/40 bg-white px-4 py-2 text-sm font-semibold text-taupe-deep transition hover:bg-taupe/10 disabled:opacity-50">{busy ? "생성 중…" : "전체 PNG"}</button>
+            {canva?.configured && (canva.connected ? (
+              <span className="flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-2 text-xs font-medium text-emerald-700">
+                캔바 {canva.name ? `· ${canva.name}` : "연결됨"} ✓
+                <button onClick={canvaLogout} className="text-emerald-600/70 hover:underline">해제</button>
+              </span>
+            ) : (
+              <a href="/api/canva/login" className="rounded-md border border-taupe/40 bg-white px-4 py-2 text-sm font-semibold text-taupe-deep transition hover:bg-taupe/10">캔바 연결</a>
+            ))}
           </div>
         </div>
-        <p className="mt-2 text-xs text-charcoal/55">💡 사이즈를 고르고, 각 포스터의 <b>⚙ 세부옵션</b>에서 로고·패널·할인율·헤더를 <b>포스터별로</b> 조절하세요. 배경을 올리면 그 위에 합성됩니다.</p>
+        <p className="mt-2 text-xs text-charcoal/55">💡 사이즈를 고르고, 각 포스터의 <b>⚙ 세부옵션</b>에서 로고·패널·할인율·헤더를 <b>포스터별로</b> 조절하세요. 배경을 올리면 그 위에 합성됩니다.{canva?.connected && <> 포스터별 <b>↗ 캔바에서 편집</b>으로 캔바에 디자인을 만들 수 있어요.</>}</p>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        {notice && <p className="mt-2 text-sm text-emerald-700">{notice}</p>}
       </div>
 
       <div className={land ? "grid justify-items-center gap-7 grid-cols-1" : "grid gap-7 md:grid-cols-2 xl:grid-cols-3"}>
@@ -321,6 +398,13 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                 <button onClick={() => setOpenOpts((m) => ({ ...m, [gi]: !m[gi] }))} className={`rounded-md border px-2 py-1.5 text-xs ${openOpts[gi] ? "border-taupe bg-taupe text-white" : "border-taupe/40 text-taupe-deep hover:bg-taupe/10"}`}>⚙</button>
               </div>
 
+              {canva?.connected && (
+                <button onClick={() => exportCanva(gi)} disabled={canvaBusy} style={{ width: previewW }}
+                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50">
+                  {canvaBusy ? "캔바로 보내는 중…" : "↗ 캔바에서 편집 (디자인 생성)"}
+                </button>
+              )}
+
               <div className="flex items-center gap-2" style={{ width: previewW }}>
                 <span className="shrink-0 text-[11px] text-charcoal/50">✎ 영문태그</span>
                 <input value={scriptFor(gi)} onChange={(e) => setScripts((m) => ({ ...m, [gi]: e.target.value }))} placeholder="예: Early Summer (빈칸=숨김)" className="min-w-0 flex-1 rounded-md border border-taupe/30 px-2 py-1 text-xs" />
@@ -349,6 +433,16 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                     </label>
                   </div>
 
+                  <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
+                    <div className="font-medium text-charcoal/60">코너 표기 (우상단)</div>
+                    <input value={o.brandTop} onChange={(e) => setO(gi, { brandTop: e.target.value })} placeholder={`윗줄 (빈칸 = EVENT · ${data.sheet})`} className="w-full rounded border border-taupe/30 px-2 py-1" />
+                    <input value={o.brandSub} onChange={(e) => setO(gi, { brandSub: e.target.value })} placeholder="아랫줄 (예: BEOMEO · 빈칸 = 숨김)" className="w-full rounded border border-taupe/30 px-2 py-1" />
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1">폰트<select value={o.brandFont} onChange={(e) => setO(gi, { brandFont: e.target.value as Opts["brandFont"] })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="sans">산세리프</option><option value="serif">세리프</option></select></label>
+                      <label className="flex items-center gap-1">형식<select value={o.brandStyle} onChange={(e) => setO(gi, { brandStyle: e.target.value as Opts["brandStyle"] })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="stack">2줄</option><option value="line">한 줄</option><option value="hidden">숨김</option></select></label>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-1">정렬<select value={o.panelAlign} onChange={(e) => setO(gi, { panelAlign: e.target.value as any })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="left">좌</option><option value="center">중</option><option value="right">우</option></select></label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showDiscount} onChange={(e) => setO(gi, { showDiscount: e.target.checked })} className="accent-taupe" />할인율</label>
@@ -361,26 +455,47 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                     </div>
                   )}
                   <div className="border-t border-taupe/15 pt-2">
-                    <div className="mb-1 flex items-center justify-between"><span className="font-medium">스티커</span><button onClick={() => resetPanel(gi)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] hover:bg-taupe/10">패널 위치 초기화</button></div>
+                    <div className="mb-1 flex items-center justify-between"><span className="font-medium">스티커 · 누끼</span><button onClick={() => resetPanel(gi)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] hover:bg-taupe/10">패널 위치 초기화</button></div>
+
+                    <div className="mb-0.5 text-[10px] font-medium text-charcoal/45">디자인 요소</div>
                     <div className="flex flex-wrap gap-1">
-                      {STICKERS.map((c) => <button key={c} onClick={() => addSticker(gi, c)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-sm leading-none hover:bg-taupe/10">{c}</button>)}
-                      {BADGES.map((c) => <button key={c} onClick={() => addSticker(gi, c, true)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] font-bold hover:bg-taupe/10">{c}</button>)}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {SVG_KEYS.map((k) => (
-                        <button key={k} onClick={() => addSticker(gi, `svg:${k}`)} title={k} className="rounded border border-taupe/30 p-1 hover:bg-taupe/10">
-                          <span style={{ fontSize: 20, lineHeight: 0, display: "block" }} dangerouslySetInnerHTML={{ __html: STICKER_SVGS[k] }} />
+                      {DESIGNED_KEYS.map((k) => (
+                        <button key={k} onClick={() => addSticker(gi, `svg:${k}`)} title={DESIGNED_LABELS[k] || k} className="rounded border border-taupe/30 bg-white p-1 hover:ring-2 hover:ring-taupe/40">
+                          <span style={{ width: 26, height: 26, display: "block" }} dangerouslySetInnerHTML={{ __html: DESIGNED_SVGS[k] }} />
                         </button>
                       ))}
                     </div>
+
+                    <div className="mt-1.5 flex gap-1.5">
+                      <button onClick={() => { setIconGi(gi); setIconResults([]); setIconNote(undefined); }} className="flex-1 rounded-md border border-taupe/40 bg-white px-2 py-1.5 text-[11px] font-medium text-taupe-deep hover:bg-taupe/10">🔎 디자인 스티커 검색</button>
+                      <label className="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed border-taupe/50 bg-white px-2 py-1.5 text-[11px] text-taupe-deep hover:bg-taupe/5">
+                        🖼 누끼 업로드
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; addImageSticker(gi, f); e.target.value = ""; }} />
+                      </label>
+                    </div>
+
+                    <div className="mt-1.5 text-[10px] font-medium text-charcoal/45">기본 도형 · 이모지</div>
+                    <div className="flex flex-wrap gap-1">
+                      {SVG_KEYS.map((k) => (
+                        <button key={k} onClick={() => addSticker(gi, `svg:${k}`)} title={k} className="rounded border border-taupe/30 p-1 hover:bg-taupe/10">
+                          <span style={{ fontSize: 18, lineHeight: 0, display: "block" }} dangerouslySetInnerHTML={{ __html: STICKER_SVGS[k] }} />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {STICKERS.map((c) => <button key={c} onClick={() => addSticker(gi, c)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-sm leading-none hover:bg-taupe/10">{c}</button>)}
+                      {BADGES.map((c) => <button key={c} onClick={() => addSticker(gi, c, true)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] font-bold hover:bg-taupe/10">{c}</button>)}
+                    </div>
+
                     {selSticker?.gi === gi && (() => {
                       const st = (stickers[gi] || []).find((s) => s.id === selSticker!.id);
                       if (!st) return null;
+                      const label = st.char.startsWith("img:") ? "🖼 이미지" : st.char.startsWith("svg:") ? (DESIGNED_LABELS[st.char.slice(4)] || st.char.slice(4)) : st.char;
                       return (
                         <div className="mt-2 space-y-1 rounded bg-white p-2">
-                          <div className="flex items-center justify-between"><span>선택: <b>{st.char}</b></span><button onClick={() => delSticker(gi, st.id)} className="text-red-600 hover:underline">삭제</button></div>
-                          <label className="flex items-center gap-2">크기<input type="range" min={0.6} max={9} step={0.1} value={st.size} onChange={(e) => updSticker(gi, st.id, { size: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
-                          <label className="flex items-center gap-2">회전<input type="range" min={-60} max={60} step={1} value={st.rot} onChange={(e) => updSticker(gi, st.id, { rot: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
+                          <div className="flex items-center justify-between"><span>선택: <b>{label}</b></span><button onClick={() => delSticker(gi, st.id)} className="text-red-600 hover:underline">삭제</button></div>
+                          <label className="flex items-center gap-2">크기<input type="range" min={0.6} max={16} step={0.1} value={st.size} onChange={(e) => updSticker(gi, st.id, { size: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
+                          <label className="flex items-center gap-2">회전<input type="range" min={-180} max={180} step={1} value={st.rot} onChange={(e) => updSticker(gi, st.id, { rot: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
                         </div>
                       );
                     })()}
@@ -412,6 +527,33 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
               ))}
             </div>
             {stockResults.length === 0 && !stockLoading && <p className="py-8 text-center text-sm text-charcoal/40">검색어를 입력하고 Enter/검색. (무료: Openverse 기본 · Pexels 키 연결 시 고품질)</p>}
+          </div>
+        </div>
+      )}
+
+      {iconGi !== null && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setIconGi(null)}>
+          <div className="mt-10 w-full max-w-3xl rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <h3 className="font-serif text-lg text-taupe-deep">디자인 스티커 검색</h3>
+              <input value={iconQ} onChange={(e) => setIconQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runIcons()} placeholder="영문 키워드: flower, sparkle, gift, ribbon, heart, sun, star, crown…" className="min-w-[200px] flex-1 rounded-md border border-taupe/30 px-3 py-1.5 text-sm" />
+              <button onClick={runIcons} disabled={iconLoading} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep disabled:opacity-50">{iconLoading ? "…" : "검색"}</button>
+              <button onClick={() => setIconGi(null)} className="rounded-md border border-taupe/30 px-3 py-1.5 text-sm text-charcoal/70">닫기</button>
+            </div>
+            <div className="mb-2 flex flex-wrap gap-1">
+              {["flower", "sparkle", "heart", "gift", "ribbon", "sun", "star", "crown", "leaf", "balloon"].map((q) => (
+                <button key={q} onClick={() => { setIconQ(q); setIconLoading(true); searchIcons(q).then((r) => { setIconResults(r.icons); setIconNote(r.note); setIconLoading(false); }); }} className="rounded-full border border-taupe/30 px-2 py-0.5 text-[11px] text-charcoal/65 hover:bg-taupe/10">{q}</button>
+              ))}
+            </div>
+            {iconNote && <p className="mb-2 text-xs text-charcoal/50">{iconNote}</p>}
+            <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
+              {iconResults.map((it) => (
+                <button key={it.id} onClick={() => pickIcon(it)} title={it.id} className="flex aspect-square items-center justify-center rounded-md border border-taupe/15 p-1.5 hover:ring-2 hover:ring-taupe">
+                  <img src={it.thumb} alt="" loading="lazy" className="h-full w-full object-contain" />
+                </button>
+              ))}
+            </div>
+            {iconResults.length === 0 && !iconLoading && <p className="py-8 text-center text-sm text-charcoal/40">키워드를 입력해 검색하세요. 컬러 이모지·일러스트(무료) 수천 종에서 클릭해 스티커로 추가합니다.</p>}
           </div>
         </div>
       )}

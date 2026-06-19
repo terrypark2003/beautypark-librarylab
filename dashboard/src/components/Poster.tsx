@@ -3,7 +3,10 @@ import type { EventGroup } from "../lib/types";
 import { THEMES } from "../lib/themes";
 import { manwon, eventPrice, normalPrice, validItems, type Sticker } from "../lib/poster";
 import { STICKER_SVGS } from "../lib/stickerAssets";
+import { DESIGNED_SVGS } from "../lib/designedStickers";
 import { logoUrl, logoWhiteUrl } from "../lib/logo";
+
+const SVGS: Record<string, string> = { ...DESIGNED_SVGS, ...STICKER_SVGS };
 
 const Spark = ({ cls }: { cls: string }) => (
   <svg className={`spk ${cls}`} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -35,6 +38,10 @@ interface Props {
   nameWeight?: number; // 상품명 굵기
   priceSize?: number; // 금액 크기 배율
   priceFont?: "serif" | "cormorant" | "sans"; // 금액 폰트
+  brandTop?: string; // 우상단 윗줄(기본: EVENT · {sheet})
+  brandSub?: string; // 우상단 아랫줄(기본: BEOMEO)
+  brandFont?: "sans" | "serif"; // 우상단 폰트
+  brandStyle?: "stack" | "line" | "hidden"; // 우상단 형식: 2줄 / 한줄 / 숨김
   panelDx?: number; // 패널 가로 이동(px, 마우스 드래그)
   panelDy?: number; // 패널 세로 이동(px)
   stickers?: Sticker[]; // 장식 스티커
@@ -58,7 +65,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", panelDx = 0, panelDy = 0, stickers = [] }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", panelDx = 0, panelDy = 0, stickers = [] }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -68,6 +75,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     const photo = bgUrl || photoBg || null;
     const showTitle = !hideTitle;
     const land = width > height;
+    const brandTopText = brandTop && brandTop.trim() ? brandTop : `EVENT · ${sheet}`;
+    const brandSubText = brandSub !== undefined ? brandSub : "BEOMEO";
 
     const styleVars = {
       ["--w" as any]: width,
@@ -120,10 +129,13 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
                   </div>
                 </div>
               )}
-              <div className="branch">
-                EVENT · {sheet}
-                <b>BEOMEO</b>
-              </div>
+              {brandStyle !== "hidden" && (
+                <div className={`branch${brandFont === "serif" ? " en" : ""}${brandStyle === "line" ? " line" : ""}`}>
+                  {brandStyle === "line"
+                    ? [brandTopText, brandSubText].filter(Boolean).join(" · ")
+                    : <>{brandTopText}{brandSubText && <b>{brandSubText}</b>}</>}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -172,11 +184,18 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
         <div className="vat">VAT 별도</div>
 
         {stickers.map((s) => {
-          const svg = s.char.startsWith("svg:") ? STICKER_SVGS[s.char.slice(4)] : null;
+          const svg = s.char.startsWith("svg:") ? SVGS[s.char.slice(4)] : null;
+          const img = s.char.startsWith("img:") ? s.char.slice(4) : null;
           return (
-            <div key={s.id} className={`sticker${s.badge ? " badge" : ""}`} data-drag={`s:${s.id}`}
+            <div key={s.id} className={`sticker${s.badge ? " badge" : ""}${img ? " img" : ""}`} data-drag={`s:${s.id}`}
               style={{ left: `${s.x}%`, top: `${s.y}%`, fontSize: `${s.size}em`, transform: `translate(-50%,-50%) rotate(${s.rot}deg)` }}>
-              {svg ? <span style={{ display: "block", width: "1em", height: "1em" }} dangerouslySetInnerHTML={{ __html: svg }} /> : s.char}
+              {svg ? (
+                <span style={{ display: "block", width: "1em", height: "1em" }} dangerouslySetInnerHTML={{ __html: svg }} />
+              ) : img ? (
+                <img src={img} alt="" style={{ display: "block", width: "1em", height: "auto" }} />
+              ) : (
+                s.char
+              )}
             </div>
           );
         })}
