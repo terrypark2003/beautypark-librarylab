@@ -88,14 +88,38 @@ export const exchangeCode = (code: string, verifier: string, redirect: string) =
 export const refresh = (refreshToken: string) =>
   tokenRequest(new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }));
 
-// ---- 세션 ----
+// ---- 세션 (캔바 토큰이 단일 쿠키 4KB 한도를 넘을 수 있어 여러 청크로 분할 저장) ----
 export type Session = { a: string; r: string; e: number };
+const SESSION_MAXAGE = 60 * 60 * 24 * 30;
+const CHUNK = 3000;
+const MAX_CHUNKS = 8;
+
+function chunkSet(name: string, value: string, maxAge: number): string[] {
+  const out: string[] = [];
+  let idx = 0;
+  for (let i = 0; i < value.length; i += CHUNK, idx++) out.push(cookie(`${name}${idx}`, value.slice(i, i + CHUNK), maxAge));
+  for (let i = idx; i < MAX_CHUNKS; i++) out.push(clearCookie(`${name}${i}`)); // 이전 잔여 청크 정리
+  out.push(clearCookie(name)); // 구버전 단일 쿠키 정리
+  return out;
+}
+function chunkRead(req: any, name: string): string | null {
+  const c = parseCookies(req);
+  let out = "", i = 0;
+  while (c[`${name}${i}`] !== undefined) { out += c[`${name}${i}`]; i++; }
+  return out || c[name] || null;
+}
+
+export const sessionSetCookies = (t: TokenResp): string[] =>
+  chunkSet(SESSION, seal({ a: t.access_token, r: t.refresh_token, e: Date.now() + (t.expires_in - 60) * 1000 } as Session), SESSION_MAXAGE);
+export function sessionClearCookies(): string[] {
+  const out = [clearCookie(SESSION)];
+  for (let i = 0; i < MAX_CHUNKS; i++) out.push(clearCookie(`${SESSION}${i}`));
+  return out;
+}
 export const readSession = (req: any): Session | null => {
-  const c = parseCookies(req)[SESSION];
-  return c ? unseal<Session>(c) : null;
+  const raw = chunkRead(req, SESSION);
+  return raw ? unseal<Session>(raw) : null;
 };
-export const sessionToCookie = (t: TokenResp) =>
-  cookie(SESSION, seal({ a: t.access_token, r: t.refresh_token, e: Date.now() + (t.expires_in - 60) * 1000 } as Session), 60 * 60 * 24 * 30);
 
 // 유효한 액세스 토큰 반환(만료 시 자동 갱신 후 세션 쿠키 재설정). 없으면 null.
 export async function getAccessToken(req: any, res: any): Promise<string | null> {
@@ -103,7 +127,7 @@ export async function getAccessToken(req: any, res: any): Promise<string | null>
   if (!s) return null;
   if (Date.now() < s.e) return s.a;
   const t = await refresh(s.r);
-  res.setHeader("Set-Cookie", sessionToCookie(t));
+  res.setHeader("Set-Cookie", sessionSetCookies(t));
   return t.access_token;
 }
 

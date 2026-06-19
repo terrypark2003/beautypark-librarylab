@@ -29,6 +29,10 @@ const clamp = (v: number) => Math.max(-10, Math.min(110, v));
 
 const sanitize = (s: string) => s.replace(/[\\/:*?"<>|\n]/g, "").replace(/\s+/g, "").slice(0, 36);
 type Plate = { url: string; hideTitle: boolean };
+type XY = { dx: number; dy: number };
+// 마우스 드래그로 조절되는 포스터별 배치(패널/로고/타이틀 이동 + 패널 크기)
+type Layout = { panel: XY; logo: XY; head: XY; panelScale: number };
+const DEFAULT_LAYOUT: Layout = { panel: { dx: 0, dy: 0 }, logo: { dx: 0, dy: 0 }, head: { dx: 0, dy: 0 }, panelScale: 1 };
 
 interface Opts {
   logoScale: number;
@@ -48,12 +52,13 @@ interface Opts {
   brandSub: string; // 우상단 아랫줄
   brandFont: "sans" | "serif"; // 우상단 폰트
   brandStyle: "stack" | "line" | "hidden"; // 우상단 형식
+  titleFx: "none" | "shadow" | "lift" | "3d" | "outline" | "glow"; // 타이틀 글자 효과
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
   showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
-  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack",
+  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none",
 };
 
 const SIZES = [
@@ -84,7 +89,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [scripts, setScripts] = useState<Record<number, string>>({});
   const [opts, setOpts] = useState<Record<number, Opts>>({});
   const [openOpts, setOpenOpts] = useState<Record<number, boolean>>({});
-  const [offsets, setOffsets] = useState<Record<number, { dx: number; dy: number }>>({});
+  const [layouts, setLayouts] = useState<Record<number, Layout>>({});
   const [stickers, setStickers] = useState<Record<number, Sticker[]>>({});
   const [selSticker, setSelSticker] = useState<{ gi: number; id: string } | null>(null);
   const dragRef = useRef<{ gi: number; tag: string; sx: number; sy: number; scale: number; base: any } | null>(null);
@@ -123,9 +128,11 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const O = (gi: number): Opts => ({ ...DEFAULT_OPTS, ...(opts[gi] || {}) });
   const setO = (gi: number, patch: Partial<Opts>) => setOpts((m) => ({ ...m, [gi]: { ...DEFAULT_OPTS, ...(m[gi] || {}), ...patch } }));
 
-  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setOffsets({}); setStickers({}); setSelSticker(null); }, [data]);
+  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setLayouts({}); setStickers({}); setSelSticker(null); }, [data]);
+  const L = (gi: number): Layout => ({ ...DEFAULT_LAYOUT, ...(layouts[gi] || {}) });
+  const setL = (gi: number, patch: Partial<Layout>) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT, ...(m[gi] || {}), ...patch } }));
 
-  // 마우스 드래그(패널 이동 / 스티커 이동)
+  // 마우스 드래그(패널/로고/타이틀 이동 · 패널 크기 · 스티커 이동)
   function onDragStart(gi: number, e: React.PointerEvent) {
     const el = (e.target as HTMLElement).closest("[data-drag]") as HTMLElement | null;
     if (!el) return;
@@ -137,8 +144,12 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       if (!st) return;
       dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { x: st.x, y: st.y } };
       setSelSticker({ gi, id });
+    } else if (tag === "panel-size") {
+      dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { s: L(gi).panelScale } };
     } else {
-      dragRef.current = { gi, tag: "panel", sx: e.clientX, sy: e.clientY, scale, base: offsets[gi] || { dx: 0, dy: 0 } };
+      // panel | logo | head
+      const cur = (L(gi) as any)[tag] as XY;
+      dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { dx: cur.dx, dy: cur.dy } };
     }
     e.currentTarget.setPointerCapture(e.pointerId);
     e.preventDefault();
@@ -148,13 +159,16 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     if (!d) return;
     const dxp = (e.clientX - d.sx) / d.scale;
     const dyp = (e.clientY - d.sy) / d.scale;
-    if (d.tag === "panel") {
-      setOffsets((m) => ({ ...m, [d.gi]: { dx: d.base.dx + dxp, dy: d.base.dy + dyp } }));
-    } else {
+    if (d.tag.startsWith("s:")) {
       const id = d.tag.slice(2);
       const x = clamp(d.base.x + (dxp / size.w) * 100);
       const y = clamp(d.base.y + (dyp / size.h) * 100);
       setStickers((m) => ({ ...m, [d.gi]: (m[d.gi] || []).map((s) => (s.id === id ? { ...s, x, y } : s)) }));
+    } else if (d.tag === "panel-size") {
+      const s = Math.max(0.6, Math.min(1.8, d.base.s + dyp / 500)); // 아래로 끌면 커지고 위로 끌면 작아짐
+      setL(d.gi, { panelScale: s });
+    } else {
+      setL(d.gi, { [d.tag]: { dx: d.base.dx + dxp, dy: d.base.dy + dyp } } as Partial<Layout>);
     }
   }
   const onDragEnd = () => { dragRef.current = null; };
@@ -184,7 +198,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     setStickers((m) => ({ ...m, [gi]: (m[gi] || []).filter((s) => s.id !== id) }));
     setSelSticker(null);
   };
-  const resetPanel = (gi: number) => setOffsets((m) => ({ ...m, [gi]: { dx: 0, dy: 0 } }));
+  const resetPanel = (gi: number) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT } }));
 
   async function runStock() {
     if (!stockQ.trim()) return;
@@ -320,8 +334,10 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount,
       nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
-      brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle,
-      panelDx: offsets[gi]?.dx || 0, panelDy: offsets[gi]?.dy || 0, stickers: stickers[gi] || [],
+      brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle, titleFx: o.titleFx,
+      panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScale: L(gi).panelScale,
+      logoDx: L(gi).logo.dx, logoDy: L(gi).logo.dy, headDx: L(gi).head.dx, headDy: L(gi).head.dy,
+      stickers: stickers[gi] || [],
     };
   };
 
@@ -433,6 +449,18 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                     </label>
                   </div>
 
+                  <div className="flex items-center gap-2 rounded border border-taupe/15 bg-white/60 p-2">
+                    <span className="font-medium text-charcoal/60">타이틀 효과</span>
+                    <select value={o.titleFx} onChange={(e) => setO(gi, { titleFx: e.target.value as Opts["titleFx"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
+                      <option value="none">없음</option>
+                      <option value="shadow">그림자</option>
+                      <option value="lift">떠있는 그림자</option>
+                      <option value="3d">3D 입체</option>
+                      <option value="outline">외곽선</option>
+                      <option value="glow">네온 글로우</option>
+                    </select>
+                  </div>
+
                   <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
                     <div className="font-medium text-charcoal/60">코너 표기 (우상단)</div>
                     <input value={o.brandTop} onChange={(e) => setO(gi, { brandTop: e.target.value })} placeholder={`윗줄 (빈칸 = EVENT · ${data.sheet})`} className="w-full rounded border border-taupe/30 px-2 py-1" />
@@ -455,7 +483,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                     </div>
                   )}
                   <div className="border-t border-taupe/15 pt-2">
-                    <div className="mb-1 flex items-center justify-between"><span className="font-medium">스티커 · 누끼</span><button onClick={() => resetPanel(gi)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] hover:bg-taupe/10">패널 위치 초기화</button></div>
+                    <div className="mb-1 flex items-center justify-between"><span className="font-medium">스티커 · 누끼</span><button onClick={() => resetPanel(gi)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] hover:bg-taupe/10">위치·크기 초기화</button></div>
 
                     <div className="mb-0.5 text-[10px] font-medium text-charcoal/45">디자인 요소</div>
                     <div className="flex flex-wrap gap-1">
@@ -499,7 +527,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                         </div>
                       );
                     })()}
-                    <div className="mt-1 text-[10px] text-charcoal/40">💡 미리보기에서 패널·스티커를 마우스로 끌어 옮기세요.</div>
+                    <div className="mt-1 text-[10px] text-charcoal/40">💡 미리보기에서 <b>로고·타이틀·패널·스티커</b>를 마우스로 끌어 옮기고, 패널 <b>아래 가장자리</b>를 위/아래로 끌면 크기가 바뀝니다.</div>
                   </div>
                 </div>
               )}
