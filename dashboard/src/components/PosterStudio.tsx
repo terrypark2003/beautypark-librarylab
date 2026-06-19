@@ -197,10 +197,10 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       const y = clamp(d.base.y + (dyp / size.h) * 100);
       setStickers((m) => ({ ...m, [d.gi]: (m[d.gi] || []).map((s) => (s.id === id ? { ...s, x, y } : s)) }));
     } else if (d.tag === "panel-size-x") {
-      const s = Math.max(0.5, Math.min(1.8, d.base.s + dxp / 420)); // 오른쪽으로 끌면 넓어짐
+      const s = Math.max(0.45, Math.min(1, d.base.s + dxp / 420)); // 우측 핸들을 안쪽으로 끌면 박스만 좁아짐(글자 크기 불변)
       setL(d.gi, { panelScaleX: s });
     } else if (d.tag === "panel-size-y") {
-      const s = Math.max(0.5, Math.min(1.8, d.base.s + dyp / 420)); // 아래로 끌면 높아짐
+      const s = Math.max(0.45, Math.min(1, d.base.s + dyp / 420)); // 하단 핸들을 위로 끌면 박스만 낮아짐(글자 크기 불변)
       setL(d.gi, { panelScaleY: s });
     } else {
       setL(d.gi, { [d.tag]: { dx: d.base.dx + dxp, dy: d.base.dy + dyp } } as Partial<Layout>);

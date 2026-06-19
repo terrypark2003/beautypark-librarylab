@@ -112,6 +112,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
       ["--title-font" as any]: titleFamily,
       ["--foot-scale" as any]: footScale,
       ["--vat-scale" as any]: vatScale,
+      ["--panel-wscale" as any]: panelScaleX,
+      ["--panel-hmax" as any]: panelScaleY,
       ["--bg" as any]: t.bg,
       ["--blob" as any]: t.blob,
       ["--ink" as any]: t.ink,
@@ -187,7 +189,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
               )}
             </div>
           )}
-          <div className="panel" data-drag="panel" style={{ transform: `translate(${panelDx}px, ${panelDy}px) scale(${panelScaleX}, ${panelScaleY})`, transformOrigin: "center top" }}>
+          <div className="panel" data-drag="panel" style={panelDx || panelDy ? { transform: `translate(${panelDx}px, ${panelDy}px)` } : undefined}>
             {showHeader && (headerPeriod || headerTarget) && (
               <div className="phead">
                 {[headerPeriod && `이벤트 기간 : ${headerPeriod}`, headerTarget && `이벤트 대상 : ${headerTarget}`].filter(Boolean).join("   |   ")}
@@ -212,8 +214,8 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
                 </div>
               );
             })}
-            <div className="panel-resize y" data-drag="panel-size-y" title="아래로 드래그해 패널 높이 조절" />
-            <div className="panel-resize x" data-drag="panel-size-x" title="좌우로 드래그해 패널 너비 조절" />
+            <div className="panel-resize y" data-drag="panel-size-y" title="위로 드래그해 박스 높이 줄이기(글자 크기 유지)" />
+            <div className="panel-resize x" data-drag="panel-size-x" title="안쪽으로 드래그해 박스 너비 줄이기(글자 크기 유지)" />
           </div>
         </div>
 
