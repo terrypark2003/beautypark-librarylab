@@ -9,6 +9,7 @@ import { themeBg } from "../lib/backgrounds";
 import type { Sticker } from "../lib/poster";
 import { searchStock, stockToDataUrl, type StockPhoto } from "../lib/stock";
 import { STICKER_SVGS, SVG_KEYS } from "../lib/stickerAssets";
+import { DESIGNED_SVGS, DESIGNED_KEYS, DESIGNED_LABELS } from "../lib/designedStickers";
 import { Poster } from "./Poster";
 
 const THEME_QUERY: Record<string, string> = {
@@ -42,11 +43,16 @@ interface Opts {
   nameWeight: number; // 상품명 굵기
   priceSize: number; // 금액 크기 배율
   priceFont: "serif" | "cormorant" | "sans"; // 금액 폰트
+  brandTop: string; // 우상단 윗줄(빈칸=기본 EVENT · 월)
+  brandSub: string; // 우상단 아랫줄
+  brandFont: "sans" | "serif"; // 우상단 폰트
+  brandStyle: "stack" | "line" | "hidden"; // 우상단 형식
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
   showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
+  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack",
 };
 
 const SIZES = [
@@ -143,10 +149,16 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const onDragEnd = () => { dragRef.current = null; };
 
   const addSticker = (gi: number, char: string, badge = false) => {
-    const size = char.startsWith("svg:") ? 4 : badge ? 1.5 : 2.6;
+    const size = char.startsWith("img:") ? 7 : char.startsWith("svg:") ? 4.5 : badge ? 1.5 : 2.6;
     const s: Sticker = { id: uid(), char, x: 50, y: 40, size, rot: 0, badge };
     setStickers((m) => ({ ...m, [gi]: [...(m[gi] || []), s] }));
     setSelSticker({ gi, id: s.id });
+  };
+  const addImageSticker = (gi: number, file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => addSticker(gi, `img:${String(reader.result)}`);
+    reader.readAsDataURL(file);
   };
   async function applyThemePhoto(gi: number) {
     const res = await searchStock(THEME_QUERY[themeFor(gi)] || "aesthetic minimal background", size.w > size.h ? "landscape" : "portrait");
@@ -253,6 +265,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount,
       nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
+      brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle,
       panelDx: offsets[gi]?.dx || 0, panelDy: offsets[gi]?.dy || 0, stickers: stickers[gi] || [],
     };
   };
@@ -349,6 +362,16 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                     </label>
                   </div>
 
+                  <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
+                    <div className="font-medium text-charcoal/60">코너 표기 (우상단)</div>
+                    <input value={o.brandTop} onChange={(e) => setO(gi, { brandTop: e.target.value })} placeholder={`윗줄 (빈칸 = EVENT · ${data.sheet})`} className="w-full rounded border border-taupe/30 px-2 py-1" />
+                    <input value={o.brandSub} onChange={(e) => setO(gi, { brandSub: e.target.value })} placeholder="아랫줄 (예: BEOMEO · 빈칸 = 숨김)" className="w-full rounded border border-taupe/30 px-2 py-1" />
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1">폰트<select value={o.brandFont} onChange={(e) => setO(gi, { brandFont: e.target.value as Opts["brandFont"] })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="sans">산세리프</option><option value="serif">세리프</option></select></label>
+                      <label className="flex items-center gap-1">형식<select value={o.brandStyle} onChange={(e) => setO(gi, { brandStyle: e.target.value as Opts["brandStyle"] })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="stack">2줄</option><option value="line">한 줄</option><option value="hidden">숨김</option></select></label>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-1">정렬<select value={o.panelAlign} onChange={(e) => setO(gi, { panelAlign: e.target.value as any })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="left">좌</option><option value="center">중</option><option value="right">우</option></select></label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showDiscount} onChange={(e) => setO(gi, { showDiscount: e.target.checked })} className="accent-taupe" />할인율</label>
@@ -361,26 +384,44 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                     </div>
                   )}
                   <div className="border-t border-taupe/15 pt-2">
-                    <div className="mb-1 flex items-center justify-between"><span className="font-medium">스티커</span><button onClick={() => resetPanel(gi)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] hover:bg-taupe/10">패널 위치 초기화</button></div>
+                    <div className="mb-1 flex items-center justify-between"><span className="font-medium">스티커 · 누끼</span><button onClick={() => resetPanel(gi)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] hover:bg-taupe/10">패널 위치 초기화</button></div>
+
+                    <div className="mb-0.5 text-[10px] font-medium text-charcoal/45">디자인 요소</div>
                     <div className="flex flex-wrap gap-1">
-                      {STICKERS.map((c) => <button key={c} onClick={() => addSticker(gi, c)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-sm leading-none hover:bg-taupe/10">{c}</button>)}
-                      {BADGES.map((c) => <button key={c} onClick={() => addSticker(gi, c, true)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] font-bold hover:bg-taupe/10">{c}</button>)}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {SVG_KEYS.map((k) => (
-                        <button key={k} onClick={() => addSticker(gi, `svg:${k}`)} title={k} className="rounded border border-taupe/30 p-1 hover:bg-taupe/10">
-                          <span style={{ fontSize: 20, lineHeight: 0, display: "block" }} dangerouslySetInnerHTML={{ __html: STICKER_SVGS[k] }} />
+                      {DESIGNED_KEYS.map((k) => (
+                        <button key={k} onClick={() => addSticker(gi, `svg:${k}`)} title={DESIGNED_LABELS[k] || k} className="rounded border border-taupe/30 bg-white p-1 hover:ring-2 hover:ring-taupe/40">
+                          <span style={{ width: 26, height: 26, display: "block" }} dangerouslySetInnerHTML={{ __html: DESIGNED_SVGS[k] }} />
                         </button>
                       ))}
                     </div>
+
+                    <label className="mt-1.5 flex cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed border-taupe/50 bg-white px-2 py-1.5 text-[11px] text-taupe-deep hover:bg-taupe/5">
+                      🖼 누끼 / 이미지 업로드 (투명 PNG 권장)
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; addImageSticker(gi, f); e.target.value = ""; }} />
+                    </label>
+
+                    <div className="mt-1.5 text-[10px] font-medium text-charcoal/45">기본 도형 · 이모지</div>
+                    <div className="flex flex-wrap gap-1">
+                      {SVG_KEYS.map((k) => (
+                        <button key={k} onClick={() => addSticker(gi, `svg:${k}`)} title={k} className="rounded border border-taupe/30 p-1 hover:bg-taupe/10">
+                          <span style={{ fontSize: 18, lineHeight: 0, display: "block" }} dangerouslySetInnerHTML={{ __html: STICKER_SVGS[k] }} />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {STICKERS.map((c) => <button key={c} onClick={() => addSticker(gi, c)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-sm leading-none hover:bg-taupe/10">{c}</button>)}
+                      {BADGES.map((c) => <button key={c} onClick={() => addSticker(gi, c, true)} className="rounded border border-taupe/30 px-1.5 py-0.5 text-[10px] font-bold hover:bg-taupe/10">{c}</button>)}
+                    </div>
+
                     {selSticker?.gi === gi && (() => {
                       const st = (stickers[gi] || []).find((s) => s.id === selSticker!.id);
                       if (!st) return null;
+                      const label = st.char.startsWith("img:") ? "🖼 이미지" : st.char.startsWith("svg:") ? (DESIGNED_LABELS[st.char.slice(4)] || st.char.slice(4)) : st.char;
                       return (
                         <div className="mt-2 space-y-1 rounded bg-white p-2">
-                          <div className="flex items-center justify-between"><span>선택: <b>{st.char}</b></span><button onClick={() => delSticker(gi, st.id)} className="text-red-600 hover:underline">삭제</button></div>
-                          <label className="flex items-center gap-2">크기<input type="range" min={0.6} max={9} step={0.1} value={st.size} onChange={(e) => updSticker(gi, st.id, { size: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
-                          <label className="flex items-center gap-2">회전<input type="range" min={-60} max={60} step={1} value={st.rot} onChange={(e) => updSticker(gi, st.id, { rot: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
+                          <div className="flex items-center justify-between"><span>선택: <b>{label}</b></span><button onClick={() => delSticker(gi, st.id)} className="text-red-600 hover:underline">삭제</button></div>
+                          <label className="flex items-center gap-2">크기<input type="range" min={0.6} max={16} step={0.1} value={st.size} onChange={(e) => updSticker(gi, st.id, { size: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
+                          <label className="flex items-center gap-2">회전<input type="range" min={-180} max={180} step={1} value={st.rot} onChange={(e) => updSticker(gi, st.id, { rot: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
                         </div>
                       );
                     })()}
