@@ -31,12 +31,21 @@ interface Props {
   headerPeriod?: string;
   headerTarget?: string;
   showDiscount?: boolean; // 할인율 % 배지
+  nameSize?: number; // 상품명 크기 배율
+  nameWeight?: number; // 상품명 굵기
+  priceSize?: number; // 금액 크기 배율
+  priceFont?: "serif" | "cormorant" | "sans"; // 금액 폰트
   panelDx?: number; // 패널 가로 이동(px, 마우스 드래그)
   panelDy?: number; // 패널 세로 이동(px)
   stickers?: Sticker[]; // 장식 스티커
 }
 
 const ALIGN: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
+const PRICE_FONTS: Record<string, { family: string; weight: number }> = {
+  serif: { family: '"Playfair Display", serif', weight: 900 },
+  cormorant: { family: '"Cormorant Garamond", serif', weight: 600 },
+  sans: { family: '"Pretendard Variable", Pretendard, sans-serif', weight: 800 },
+};
 
 // 긴 시술명은 글자를 줄여 어색한 줄바꿈 방지
 function nameScale(name: string): number {
@@ -49,8 +58,9 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, panelDx = 0, panelDy = 0, stickers = [] }, ref) => {
+  ({ group, themeKey, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", panelDx = 0, panelDy = 0, stickers = [] }, ref) => {
     const theme = THEMES[themeKey] || THEMES.summer;
+    const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
     const h = theme.headline(group);
     const items = validItems(group);
@@ -67,6 +77,10 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
       ["--panel-bottom" as any]: panelBottom,
       ["--panel-width" as any]: panelWidth,
       ["--panel-align" as any]: ALIGN[panelAlign] || "center",
+      ["--name-weight" as any]: nameWeight,
+      ["--price-size" as any]: priceSize,
+      ["--price-font" as any]: pf.family,
+      ["--price-weight" as any]: pf.weight,
       ["--bg" as any]: t.bg,
       ["--blob" as any]: t.blob,
       ["--ink" as any]: t.ink,
@@ -139,7 +153,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
               const disc = n && e ? Math.round((1 - e / n) * 100) : 0;
               return (
                 <div className="row" key={i}>
-                  <div className="name" style={{ fontSize: `${nameScale(it.name)}em` }}>{it.name}</div>
+                  <div className="name" style={{ fontSize: `${nameScale(it.name) * nameSize}em` }}>{it.name}</div>
                   <div className="price">
                     {showDiscount && disc > 0 && <span className="disc">{disc}%</span>}
                     {n != null && <span className="was">{manwon(n)}만원</span>}
