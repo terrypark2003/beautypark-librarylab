@@ -1,5 +1,6 @@
 // Vercel 서버리스: 이벤트 패키지(시술 조합) 추천. GEMINI 우선 → ANTHROPIC 폴백.
 // 입력 시술 풀 안에서만 조합. 출력: [{title, items:[시술명]}]
+import { costUsd } from "./_pricing";
 
 function buildPrompt(month: string, pool: string[], examples: string[], description: string): string {
   return `너는 대구 수성구 피부과 "뷰티파크의원 범어점"의 마케팅 기획자다.
@@ -37,8 +38,13 @@ function parseGroups(text: string): any[] {
   }
 }
 
-async function callGemini(key: string, prompt: string): Promise<{ text: string | null; err: string }> {
-  const models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-flash-latest"];
+const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-flash-latest"];
+const CLAUDE_DEFAULT = "claude-haiku-4-5";
+
+type Call = { text: string | null; err: string; model: string; inTok: number; outTok: number };
+
+async function callGemini(key: string, prompt: string, preferred?: string): Promise<Call> {
+  const models = Array.from(new Set([preferred, ...GEMINI_MODELS].filter(Boolean) as string[]));
   let err = "";
   for (const model of models) {
     try {
@@ -48,29 +54,38 @@ async function callGemini(key: string, prompt: string): Promise<{ text: string |
       if (!r.ok) { err = `${model} ${r.status}: ${(await r.text()).slice(0, 140)}`; continue; }
       const d = await r.json();
       const t = d?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (t) return { text: t, err: "" };
+      if (t) return { text: t, err: "", model, inTok: d?.usageMetadata?.promptTokenCount || 0, outTok: d?.usageMetadata?.candidatesTokenCount || 0 };
       err = `${model}: no text`;
     } catch (e: any) { err = `${model}: ${e?.message || e}`; }
   }
-  return { text: null, err };
+  return { text: null, err, model: "", inTok: 0, outTok: 0 };
 }
 
-async function callAnthropic(key: string, prompt: string): Promise<{ text: string | null; err: string }> {
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 900, messages: [{ role: "user", content: prompt }] }),
-    });
-    if (!r.ok) return { text: null, err: `anthropic ${r.status}` };
-    const d = await r.json();
-    return { text: d?.content?.[0]?.text ?? null, err: "" };
-  } catch (e: any) {
-    return { text: null, err: `anthropic: ${e?.message || e}` };
+async function callAnthropic(key: string, prompt: string, preferred?: string): Promise<Call> {
+  const models = Array.from(new Set([preferred, CLAUDE_DEFAULT].filter(Boolean) as string[]));
+  let err = "";
+  for (const model of models) {
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model, max_tokens: 900, messages: [{ role: "user", content: prompt }] }),
+      });
+      if (!r.ok) { err = `${model} ${r.status}: ${(await r.text()).slice(0, 120)}`; continue; }
+      const d = await r.json();
+      const t = d?.content?.[0]?.text;
+      if (t) return { text: t, err: "", model, inTok: d?.usage?.input_tokens || 0, outTok: d?.usage?.output_tokens || 0 };
+      err = `${model}: no text`;
+    } catch (e: any) { err = `${model}: ${e?.message || e}`; }
   }
+  return { text: null, err, model: "", inTok: 0, outTok: 0 };
 }
 
 export default async function handler(req: any, res: any) {
+  if (req.method === "GET") {
+    res.status(200).json({ ok: true, providers: { gemini: !!process.env.GEMINI_API_KEY, anthropic: !!process.env.ANTHROPIC_API_KEY } });
+    return;
+  }
   if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
   const gemini = process.env.GEMINI_API_KEY;
   const anthropic = process.env.ANTHROPIC_API_KEY;
@@ -78,6 +93,7 @@ export default async function handler(req: any, res: any) {
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
   const provider = body?.provider || "auto";
+  const model: string | undefined = typeof body?.model === "string" ? body.model : undefined;
   const month: string = body?.month || "";
   const pool: string[] = Array.isArray(body?.treatments) ? body.treatments.filter((t: any) => typeof t === "string") : [];
   const examples: string[] = Array.isArray(body?.examples) ? body.examples.filter((e: any) => typeof e === "string") : [];
@@ -91,10 +107,11 @@ export default async function handler(req: any, res: any) {
   }
 
   const prompt = buildPrompt(month, pool, examples, description);
-  let text: string | null = null, via = "", diag = "";
-  if (useG) { const g = await callGemini(gemini!, prompt); if (g.text) { text = g.text; via = "gemini"; } else diag += `G(${g.err}) `; }
-  if (!text && useA) { const a = await callAnthropic(anthropic!, prompt); if (a.text) { text = a.text; via = "anthropic"; } else diag += `A(${a.err})`; }
+  let text: string | null = null, via = "", usedModel = "", diag = "";
+  let inTok = 0, outTok = 0;
+  if (useG) { const g = await callGemini(gemini!, prompt, model); if (g.text) { text = g.text; via = "gemini"; usedModel = g.model; inTok = g.inTok; outTok = g.outTok; } else diag += `G(${g.err}) `; }
+  if (!text && useA) { const a = await callAnthropic(anthropic!, prompt, model); if (a.text) { text = a.text; via = "anthropic"; usedModel = a.model; inTok = a.inTok; outTok = a.outTok; } else diag += `A(${a.err})`; }
 
   if (!text) { res.status(200).json({ groups: [], note: `AI 실패: ${diag.slice(0, 200)}` }); return; }
-  res.status(200).json({ groups: parseGroups(text), via });
+  res.status(200).json({ groups: parseGroups(text), via, model: usedModel, usage: { input: inTok, output: outTok }, cost: costUsd(usedModel, inTok, outTok) });
 }
