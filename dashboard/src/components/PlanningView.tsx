@@ -257,7 +257,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-taupe/10 text-xs text-taupe-deep">
-                  <th className={`${cell} w-44 text-left`}>타이틀</th>
+                  <th className={`${cell} w-52 text-left`}>타이틀</th>
                   <th className={`${cell} text-left`}>시술명</th>
                   <th className={`${cell} w-24`}>정상가<div className="font-normal text-charcoal/40">부가세 전</div></th>
                   <th className={`${cell} w-24`}>이벤트가<div className="font-normal text-charcoal/40">부가세 전</div></th>
@@ -272,7 +272,9 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
                     <tr key={`${gi}-${ii}`} className="align-top">
                       {ii === 0 && (
                         <td className={`${cell} bg-ivory/50 align-top`} rowSpan={g.items.length}>
-                          <input value={g.group} onChange={(e) => up((p) => { p[gi].group = e.target.value; return p; })} className="w-full bg-transparent text-sm font-semibold outline-none" />
+                          <textarea value={g.group} onChange={(e) => up((p) => { p[gi].group = e.target.value; return p; })} rows={1}
+                            ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; } }}
+                            className="w-full resize-none break-words bg-transparent text-sm font-semibold leading-snug outline-none" />
                           <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
                             <button onClick={() => up((p) => { p[gi].items.push({ name: "", normal: "", event: "" }); return p; })} className="text-taupe hover:underline">+ 시술</button>
                             <button onClick={() => up((p) => { p.splice(gi, 1); return p; })} className="text-charcoal/40 hover:text-red-600">그룹삭제</button>
