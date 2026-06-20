@@ -487,22 +487,27 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
               </div>
 
               <div className="flex items-center gap-1.5" style={{ width: previewW }}>
+                <span className="shrink-0 text-[11px] font-medium text-charcoal/55">테마</span>
                 {!plate ? (
                   <>
                     <select value={themeFor(gi)} onChange={(e) => setThemes((m) => ({ ...m, [gi]: e.target.value }))} className="min-w-0 flex-1 rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
                       {themeOptions.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
                     </select>
-                    <button onClick={() => { setAiGi(gi); setAiPrompt(""); setAiNote(undefined); }} title="AI로 테마 색 만들기" className="shrink-0 rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-taupe-deep hover:bg-taupe/10">✨AI</button>
+                    <button onClick={() => { setAiGi(gi); setAiPrompt(""); setAiNote(undefined); }} title="AI로 색·레이아웃·배경 자동 디자인" className="shrink-0 rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-taupe-deep hover:bg-taupe/10">✨AI</button>
                   </>
                 ) : (
                   <label className="flex min-w-0 flex-1 items-center gap-1 rounded-md border border-taupe/30 bg-white px-1.5 py-1.5 text-xs text-charcoal/75">
                     <input type="checkbox" checked={plate.hideTitle} onChange={() => toggleHide(gi)} className="accent-taupe" />타이틀 숨김
                   </label>
                 )}
-                <select value={variantFor(gi)} onChange={(e) => setVariants((m) => ({ ...m, [gi]: e.target.value }))} title="레이아웃" className="rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
+              </div>
+
+              <div className="flex items-center gap-1.5" style={{ width: previewW }}>
+                <span className="shrink-0 text-[11px] font-medium text-charcoal/55">레이아웃</span>
+                <select value={variantFor(gi)} onChange={(e) => setVariants((m) => ({ ...m, [gi]: e.target.value }))} className="min-w-0 flex-1 rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
                   {LAYOUTS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}
                 </select>
-                <button onClick={() => downloadOne(gi)} className="rounded-md bg-taupe px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-taupe-deep">PNG</button>
+                <button onClick={() => downloadOne(gi)} className="shrink-0 rounded-md bg-taupe px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-taupe-deep">PNG</button>
               </div>
 
               <div className="flex items-center gap-2" style={{ width: previewW }}>
