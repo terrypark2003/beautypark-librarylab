@@ -56,7 +56,7 @@ function parsePalette(text: string): Palette | null {
 }
 
 const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-flash-latest"];
-const CLAUDE_DEFAULT = "claude-haiku-4-5";
+const CLAUDE_FALLBACKS = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"];
 type Call = { text: string | null; err: string; model: string; inTok: number; outTok: number };
 
 async function callGemini(key: string, prompt: string, preferred?: string): Promise<Call> {
@@ -77,7 +77,8 @@ async function callGemini(key: string, prompt: string, preferred?: string): Prom
 }
 
 async function callAnthropic(key: string, prompt: string, preferred?: string): Promise<Call> {
-  const models = Array.from(new Set([preferred, CLAUDE_DEFAULT].filter(Boolean) as string[]));
+  const pref = preferred === "claude-haiku-4-5" ? "claude-haiku-4-5-20251001" : preferred;
+  const models = Array.from(new Set([pref, ...CLAUDE_FALLBACKS].filter(Boolean) as string[]));
   let err = "";
   for (const model of models) {
     try {

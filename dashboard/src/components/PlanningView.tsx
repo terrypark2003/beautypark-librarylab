@@ -87,6 +87,8 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
   const [pkgGroups, setPkgGroups] = useState<PackageGroup[]>([]);
   const [pkgNote, setPkgNote] = useState<string | undefined>();
   const [pkgLoading, setPkgLoading] = useState(false);
+  const [pkgEventCount, setPkgEventCount] = useState(6); // 추천받을 이벤트(패키지) 수
+  const [pkgItems, setPkgItems] = useState(2); // 이벤트당 시술 수
 
   const effHistory = useMemo(() => ({ ...history, ...overrides }), [overrides]);
   const refs = useMemo(() => references(y, m, effHistory), [y, m, effHistory]);
@@ -103,7 +105,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
     const pool = Array.from(new Set(Object.values(effHistory).flatMap((hm) => hm.groups.flatMap((g) => g.items.map((i) => i.name.trim()))))).filter(Boolean);
     const examples = Array.from(new Set(Object.values(effHistory).flatMap((hm) => hm.groups.map((g) => g.group.trim())))).filter(Boolean).slice(0, 40);
     const { provider, model } = parseEngine(aiEngine);
-    const res = await suggestPackages({ month: key(y, m), treatments: pool, description: pkgDesc, examples, provider, model });
+    const res = await suggestPackages({ month: key(y, m), treatments: pool, description: pkgDesc, examples, provider, model, eventCount: pkgEventCount, itemsPerEvent: pkgItems });
     setPkgGroups(res.groups); setPkgNote(res.note); setPkgLoading(false);
   }
   const toPGroup = (g: PackageGroup): PGroup => ({
@@ -219,7 +221,9 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
           <div className="mb-4 rounded-lg border border-taupe-deep/25 bg-ivory/70 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-taupe-deep">✨ AI 패키지 추천</span>
-              <input value={pkgDesc} onChange={(e) => setPkgDesc(e.target.value)} placeholder="원하는 방향(선택): 예) 휴가 후 미백·진정 위주, 평일 화수목 포함" className="min-w-[200px] flex-1 rounded-md border border-taupe/30 px-2.5 py-1.5 text-sm" />
+              <input value={pkgDesc} onChange={(e) => setPkgDesc(e.target.value)} placeholder="원하는 방향(선택): 예) 휴가 후 미백·진정 위주, 평일 화수목 포함" className="min-w-[180px] flex-1 rounded-md border border-taupe/30 px-2.5 py-1.5 text-sm" />
+              <label className="flex items-center gap-1 text-xs text-charcoal/60">이벤트<input type="number" min={1} max={12} value={pkgEventCount} onChange={(e) => setPkgEventCount(Math.max(1, Math.min(12, Math.round(Number(e.target.value)) || 6)))} className="w-12 rounded border border-taupe/30 px-1.5 py-1 text-sm" />개</label>
+              <label className="flex items-center gap-1 text-xs text-charcoal/60">시술<input type="number" min={1} max={6} value={pkgItems} onChange={(e) => setPkgItems(Math.max(1, Math.min(6, Math.round(Number(e.target.value)) || 2)))} className="w-12 rounded border border-taupe/30 px-1.5 py-1 text-sm" />개</label>
               <EngineSelect value={aiEngine} onChange={setAiEngine} />
               <button onClick={runPkg} disabled={pkgLoading} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep disabled:opacity-50">{pkgLoading ? "구상 중…" : "추천받기"}</button>
               {pkgGroups.length > 0 && <button onClick={applyAllPkg} className="rounded-md border border-taupe-deep/50 px-3 py-1.5 text-sm font-semibold text-taupe-deep hover:bg-taupe/10">이 구성으로 기획표 채우기 ↧</button>}

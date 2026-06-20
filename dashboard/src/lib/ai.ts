@@ -76,7 +76,7 @@ function pkgFallback(input: { month: string; treatments: string[] }): PackageGro
     .slice(0, 6);
 }
 
-export async function suggestPackages(input: { month: string; treatments: string[]; description?: string; examples?: string[]; provider?: string; model?: string }): Promise<PackageResult> {
+export async function suggestPackages(input: { month: string; treatments: string[]; description?: string; examples?: string[]; provider?: string; model?: string; eventCount?: number; itemsPerEvent?: number }): Promise<PackageResult> {
   try {
     const r = await fetch("/api/packages", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
     if (r.ok) {
