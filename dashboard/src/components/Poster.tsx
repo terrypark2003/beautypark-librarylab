@@ -135,7 +135,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
     };
 
     return (
-      <div ref={ref} className={`poster v-${variant}${photo ? " has-photo" : ""}${land ? " land" : ""}${titleFx && titleFx !== "none" ? ` fx-${titleFx}` : ""}`} style={styleVars}>
+      <div ref={ref} className={`poster v-${variant}${photo ? " has-photo" : ""}${land ? " land" : ""}${titleFx && titleFx !== "none" ? ` fx-${titleFx}` : ""}${!showPrice ? " noprice" : ""}`} style={styleVars}>
         {photo ? (
           <div className="photo" data-drag="bg" style={{ backgroundImage: `url(${photo})`, transform: bgDx || bgDy || bgZoom !== 1 ? `translate(${bgDx}px, ${bgDy}px) scale(${bgZoom})` : undefined }} />
         ) : (
