@@ -21,7 +21,7 @@ function buildPrompt(desc: string): string {
   "divider": "#카드 구분선(연한 색)",
   "was": "#정가 취소선 회색",
   "bgQuery": "이 분위기에 어울리는 배경 사진을 찾기 위한 영문 스톡 검색어(예: soft beige silk texture, calm blue water surface)",
-  "layout": "classic | center | band | editorial | minimal | studio 중 하나(이 분위기에 가장 어울리는 레이아웃. band=제목을 컬러 박스 안에, studio=풀블리드 사진+미니멀, editorial=좌측 강조선)",
+  "layout": "classic | center | band | editorial | minimal | studio | magazine | ticket | sidebar | split 중 하나(이 분위기에 가장 어울리는 레이아웃. band=제목을 컬러 박스 안에, studio=풀블리드 사진+미니멀, editorial=좌측 강조선, magazine=세리프 잡지, ticket=쿠폰, sidebar=좌측 컬러 띠, split=상하 분할)",
   "titleFx": "none | shadow | lift | 3d | outline | glow | gradient | gold | longshadow | emboss 중 하나(제목 글자 효과)"
 }
 규칙:
@@ -32,7 +32,7 @@ function buildPrompt(desc: string): string {
 }
 
 type Palette = { label: string; tag: string; bg: string; blob: string; ink: string; accent: string; accentDeep: string; scriptColor: string; panel: string; divider: string; was: string; bgQuery: string; layout: string; titleFx: string };
-const LAYOUTS = ["classic", "center", "band", "editorial", "minimal", "studio"];
+const LAYOUTS = ["classic", "center", "band", "editorial", "minimal", "studio", "magazine", "ticket", "sidebar", "split"];
 const FX = ["none", "shadow", "lift", "3d", "outline", "glow", "gradient", "gold", "longshadow", "emboss"];
 
 function parsePalette(text: string): Palette | null {

@@ -51,7 +51,7 @@
 .poster .title { font-weight: 800; font-family: var(--title-font, "Pretendard Variable", Pretendard, sans-serif); font-size: calc(2.3em * var(--title-scale, 1)); line-height: 1.14; letter-spacing: -.01em; }
 .poster .title .l2 { display: block; color: var(--accent-deep); }
 
-.poster .panel { position: relative; background: var(--panel); border-radius: 1.05em; box-shadow: 0 .7em 1.8em rgba(80,66,48,.13); display: flex; flex-direction: column; padding: .45em 0; margin-top: calc(var(--panel-top, 0) * 1em); margin-bottom: calc(var(--panel-bottom, 0) * 1em); }
+.poster .panel { position: relative; background: var(--panel); border-radius: 1.2em; box-shadow: 0 .85em 2.1em rgba(80,66,48,.12); display: flex; flex-direction: column; padding: .5em 0; margin-top: calc(var(--panel-top, 0) * 1em); margin-bottom: calc(var(--panel-bottom, 0) * 1em); }
 .poster .body > .panel { width: 100%; }
 .poster:not(.land) .body > .panel { flex: 1; width: calc(var(--panel-width, 100) * 1% * var(--panel-wscale, 1)); align-self: var(--panel-align, center); max-height: calc(var(--panel-hmax, 1) * 100%); }
 .poster.land .body > .panel { flex: 1.15; align-self: stretch; max-height: calc(var(--panel-hmax, 1) * 100%); }
@@ -161,3 +161,31 @@
   color: #fff !important; text-shadow: 0 .05em .4em rgba(0,0,0,.42);
 }
 .poster.has-photo.v-studio .hl-rule, .poster.has-photo.v-studio .studio-brand { border-color: rgba(255,255,255,.72); }
+
+/* ===== magazine: 고급 에디토리얼(세리프 + 헤어라인) ===== */
+.poster.v-magazine .head { border-top: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); padding: .6em 0; }
+.poster.v-magazine .script { font-family: "Playfair Display", serif; font-style: italic; font-size: 1.55em; margin-bottom: .1em; }
+.poster.v-magazine .sup { letter-spacing: .34em; text-transform: uppercase; font-size: .6em; }
+.poster.v-magazine .title { font-family: "Playfair Display", serif; font-weight: 700; letter-spacing: 0; font-size: calc(2.55em * var(--title-scale, 1)); }
+.poster.v-magazine .body { gap: 1.35em; }
+.poster.v-magazine .panel { box-shadow: 0 .5em 1.5em rgba(80,66,48,.1); }
+.poster.has-photo.v-magazine .head { border-color: rgba(255,255,255,.7); }
+
+/* ===== ticket: 쿠폰/티켓 ===== */
+.poster.v-ticket .panel { background: var(--panel); border: 1.5px dashed color-mix(in srgb, var(--accent) 60%, transparent); border-radius: 1.1em; box-shadow: 0 .5em 1.4em rgba(80,66,48,.12); }
+.poster.v-ticket .row { border-bottom: 1.5px dashed var(--divider); }
+.poster.v-ticket .row:last-child { border-bottom: 0; }
+.poster.v-ticket .phead { border-radius: .95em .95em 0 0; border-bottom: 1.5px dashed rgba(255,255,255,.55); }
+.poster.v-ticket .now { color: var(--accent-deep); }
+
+/* ===== sidebar: 좌측 컬러 띠 + 우측 가격표 ===== */
+.poster:not(.land).v-sidebar .body { flex-direction: row; align-items: stretch; gap: 1em; }
+.poster.v-sidebar .head { flex: 0 0 40%; background: var(--accent-deep); color: #fff; border-radius: 1em; padding: 1.1em 1em; display: flex; flex-direction: column; justify-content: center; }
+.poster.v-sidebar .head .title, .poster.v-sidebar .head .title .l2, .poster.v-sidebar .head .script, .poster.v-sidebar .head .sup, .poster.v-sidebar .head .badge { color: #fff !important; text-shadow: none; }
+.poster.v-sidebar .head .badge { background: rgba(255,255,255,.22); }
+.poster.v-sidebar .body > .panel { flex: 1; width: auto; align-self: stretch; max-height: none; }
+
+/* ===== split: 위 사진 / 아래 패널(상하 분할) ===== */
+.poster.v-split .body { justify-content: space-between; }
+.poster:not(.land).v-split .body > .panel { width: 100%; flex: 0 1 auto; align-self: stretch; max-height: calc(56% * var(--panel-hmax, 1)); border-radius: 1.3em 1.3em .45em .45em; }
+.poster.v-split .head { margin-top: .2em; }

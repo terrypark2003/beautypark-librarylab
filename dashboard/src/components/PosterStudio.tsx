@@ -89,6 +89,8 @@ const LAYOUTS = [
   { key: "classic", label: "기본" }, { key: "center", label: "센터" }, { key: "band", label: "밴드" },
   { key: "editorial", label: "에디토리얼" }, { key: "minimal", label: "미니멀" },
   { key: "studio", label: "미니멀 에디토리얼" },
+  { key: "magazine", label: "매거진" }, { key: "ticket", label: "쿠폰/티켓" },
+  { key: "sidebar", label: "사이드바" }, { key: "split", label: "하프 분할" },
 ] as const;
 
 const TITLE_FX: { v: Opts["titleFx"]; label: string }[] = [
