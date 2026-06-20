@@ -145,6 +145,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const stateRef = useRef<{ themes: Record<number, string>; plates: Record<number, Plate>; data: RequestData }>({ themes: {}, plates: {}, data: {} as RequestData });
   const [cap, setCap] = useState<{ gi: number; name: string; action: "download" | "canva" } | null>(null);
   // 캔바 연동
   const [canva, setCanva] = useState<{ configured: boolean; connected: boolean; name?: string } | null>(null);
@@ -200,6 +202,28 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const L = (gi: number): Layout => ({ ...DEFAULT_LAYOUT, ...(layouts[gi] || {}) });
   const setL = (gi: number, patch: Partial<Layout>) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT, ...(m[gi] || {}), ...patch } }));
   const lastTapRef = useRef<{ gi: number; tag: string; t: number } | null>(null); // 더블탭 감지용
+  stateRef.current = { themes, plates, data };
+  // 배경 휠 줌(원래 비율 유지). 페이지 스크롤을 막으려면 passive:false 네이티브 리스너 필요
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const t = (e.target as HTMLElement).closest("[data-gi]") as HTMLElement | null;
+      if (!t) return;
+      const gi = Number(t.getAttribute("data-gi"));
+      const st = stateRef.current;
+      const tk = st.themes[gi] ?? themeKeyForGroup(st.data.groups[gi]?.group ?? "");
+      if (!(st.plates[gi] || themeBg(tk))) return; // 배경 사진이 있을 때만
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+      setLayouts((m) => {
+        const cur = { ...DEFAULT_LAYOUT, ...(m[gi] || {}) };
+        return { ...m, [gi]: { ...cur, bgZoom: Math.max(1, Math.min(3, cur.bgZoom * factor)) } };
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   // 마우스 드래그(패널/로고/타이틀 이동 · 패널 크기 · 스티커 이동)
   function onDragStart(gi: number, e: React.PointerEvent) {
@@ -474,15 +498,15 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         {notice && <p className="mt-2 text-sm text-emerald-700">{notice}</p>}
       </div>
 
-      <div className="grid justify-items-center gap-7 grid-cols-1">
+      <div ref={gridRef} className="grid justify-items-center gap-7 grid-cols-1">
         {data.groups.map((g, gi) => {
           const plate = plates[gi];
           const o = O(gi);
           return (
             <div key={gi} className="flex flex-col items-center gap-2.5">
-              <div style={{ ...previewWrap(size.w, size.h), touchAction: "none", cursor: "grab" }}
+              <div data-gi={gi} style={{ ...previewWrap(size.w, size.h), touchAction: "none", cursor: "grab" }}
                 onPointerDown={(e) => onDragStart(gi, e)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}
-                onDoubleClick={(e) => onTitleDblClick(gi, e)} title="타이틀을 더블클릭하면 글자·폰트·효과를 편집할 수 있어요">
+                onDoubleClick={(e) => onTitleDblClick(gi, e)} title="배경 위에서 마우스 휠로 확대/축소 · 끌어서 위치 · 타이틀 더블클릭 편집">
                 <div style={previewInner}><Poster {...posterProps(gi)} /></div>
               </div>
 
