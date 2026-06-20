@@ -20,8 +20,9 @@
   -webkit-mask-image: linear-gradient(180deg, #000, transparent 42%);
   mask-image: linear-gradient(180deg, #000, transparent 42%);
 }
-.poster .photo { position: absolute; inset: 0; background-position: center; background-size: cover; background-repeat: no-repeat; }
-.poster .scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(22,24,34,.42), rgba(22,24,34,.08) 30%, transparent 48%, transparent 64%, rgba(22,24,34,.16)); }
+.poster .photo { position: absolute; inset: 0; background-position: center; background-size: cover; background-repeat: no-repeat; transform-origin: center; }
+.poster .photo[data-drag] { cursor: grab; }
+.poster .scrim { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(22,24,34,.42), rgba(22,24,34,.08) 30%, transparent 48%, transparent 64%, rgba(22,24,34,.16)); }
 .poster .spk { position: absolute; fill: var(--accent); opacity: .42; }
 .poster .spk.s1 { top: 16%; right: 11%; width: 1.7em; height: 1.7em; }
 .poster .spk.s2 { top: 24%; right: 26%; width: 1em; height: 1em; opacity: .3; }
@@ -47,13 +48,13 @@
 .poster .script { font-family: "Pinyon Script", cursive; font-size: 2.4em; color: var(--script); line-height: .8; margin-bottom: .18em; }
 .poster .sup { font-size: .82em; font-weight: 600; color: var(--accent); letter-spacing: .03em; margin-bottom: .35em; }
 .poster .badge { display: inline-block; background: var(--accent-deep); color: #fff; font-weight: 800; font-size: .78em; letter-spacing: .06em; padding: .28em .82em; border-radius: 1em; margin-bottom: .5em; }
-.poster .title { font-weight: 800; font-size: 2.3em; line-height: 1.14; letter-spacing: -.01em; }
+.poster .title { font-weight: 800; font-family: var(--title-font, "Pretendard Variable", Pretendard, sans-serif); font-size: calc(2.3em * var(--title-scale, 1)); line-height: 1.14; letter-spacing: -.01em; }
 .poster .title .l2 { display: block; color: var(--accent-deep); }
 
-.poster .panel { position: relative; background: var(--panel); border-radius: 1.05em; box-shadow: 0 .7em 1.8em rgba(80,66,48,.13); display: flex; flex-direction: column; padding: .45em 0; margin-top: calc(var(--panel-top, 0) * 1em); margin-bottom: calc(var(--panel-bottom, 0) * 1em); }
+.poster .panel { position: relative; background: var(--panel); border-radius: 1.2em; box-shadow: 0 .85em 2.1em rgba(80,66,48,.12); display: flex; flex-direction: column; padding: .5em 0; margin-top: calc(var(--panel-top, 0) * 1em); margin-bottom: calc(var(--panel-bottom, 0) * 1em); }
 .poster .body > .panel { width: 100%; }
-.poster:not(.land) .body > .panel { flex: 1; width: calc(var(--panel-width, 100) * 1%); align-self: var(--panel-align, center); }
-.poster.land .body > .panel { flex: 1.15; align-self: stretch; max-height: 100%; }
+.poster:not(.land) .body > .panel { flex: 1; width: calc(var(--panel-width, 100) * 1% * var(--panel-wscale, 1)); align-self: var(--panel-align, center); max-height: calc(var(--panel-hmax, 1) * 100%); }
+.poster.land .body > .panel { flex: 1.15; align-self: stretch; max-height: calc(var(--panel-hmax, 1) * 100%); }
 .poster .panel .phead { margin-top: -.45em; background: var(--accent-deep); color: #fff; font-size: .58em; font-weight: 600; letter-spacing: .02em; padding: .9em 1.4em; border-radius: 1.05em 1.05em 0 0; text-align: center; }
 .poster .row { flex: 1; display: flex; align-items: center; justify-content: space-between; padding: 0 1.55em; border-bottom: 1px solid var(--divider); }
 .poster .row .disc { font-size: .6em; font-weight: 800; color: #fff; background: #d24b4b; border-radius: 1em; padding: .16em .55em; align-self: center; }
@@ -64,8 +65,8 @@
 .poster .now { font-family: var(--price-font, "Playfair Display", serif); font-weight: var(--price-weight, 900); font-size: calc(2.25em * var(--price-size, 1)); color: var(--accent-deep); line-height: 1; }
 .poster .unit { font-family: "Pretendard Variable", Pretendard; font-size: .42em; font-weight: 800; margin-left: .06em; }
 
-.poster .foot { position: relative; text-align: center; font-size: .84em; font-weight: 600; color: var(--accent); padding-top: .3em; }
-.poster .vat { position: absolute; right: 1.9em; bottom: 1.6em; border: .05em solid color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent); font-size: .62em; font-weight: 700; padding: .3em .8em; border-radius: .3em; }
+.poster .foot { position: relative; text-align: center; font-size: calc(.84em * var(--foot-scale, 1)); font-weight: 600; color: var(--accent); padding-top: .3em; }
+.poster .vat { position: absolute; right: 1.9em; bottom: 1.6em; border: .05em solid color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent); font-size: calc(.62em * var(--vat-scale, 1)); font-weight: 700; padding: .3em .8em; border-radius: .3em; }
 
 .poster.has-photo .wm, .poster.has-photo .sub, .poster.has-photo .branch, .poster.has-photo .branch b,
 .poster.has-photo .title, .poster.has-photo .title .l2, .poster.has-photo .sup, .poster.has-photo .script {
@@ -80,10 +81,12 @@
 .poster .sticker { position: absolute; z-index: 6; line-height: 1; white-space: nowrap; user-select: none; cursor: grab; filter: drop-shadow(0 .08em .25em rgba(0,0,0,.18)); }
 .poster .sticker.badge { font-family: "Pretendard Variable", Pretendard, sans-serif; font-weight: 800; color: #fff; background: var(--accent-deep); padding: .22em .6em; border-radius: 1em; letter-spacing: .02em; }
 .poster .panel[data-drag] { cursor: grab; }
-/* 드래그로 위치 이동 가능한 요소(로고/타이틀) */
-.poster .logo-img[data-drag], .poster .logo[data-drag], .poster .head[data-drag] { cursor: grab; }
-/* 패널 하단 크기조절 핸들 — 평소엔 숨김(=PNG 캡처에 안 나옴), 패널에 마우스 올리면 표시 */
-.poster .panel-resize { position: absolute; left: 18%; right: 18%; bottom: -.45em; height: .9em; border-radius: 1em; cursor: ns-resize; opacity: 0; transition: opacity .15s; z-index: 7; }
+/* 드래그로 위치 이동 가능한 요소(로고/타이틀/하단문구/VAT) */
+.poster .logo-img[data-drag], .poster .logo[data-drag], .poster .head[data-drag], .poster .foot[data-drag], .poster .vat[data-drag] { cursor: grab; }
+/* 패널 크기조절 핸들 — 평소엔 숨김(=PNG 캡처에 안 나옴), 패널에 마우스 올리면 표시 */
+.poster .panel-resize { position: absolute; border-radius: 1em; opacity: 0; transition: opacity .15s; z-index: 7; }
+.poster .panel-resize.y { left: 18%; right: 18%; bottom: -.45em; height: .9em; cursor: ns-resize; }
+.poster .panel-resize.x { top: 18%; bottom: 18%; right: -.45em; width: .9em; cursor: ew-resize; }
 .poster .panel:hover .panel-resize { opacity: 1; background: color-mix(in srgb, var(--accent) 60%, #fff); box-shadow: 0 .1em .4em rgba(0,0,0,.18); }
 
 /* ===== 레이아웃 변형 ===== */
@@ -92,7 +95,9 @@
 .poster.v-center .badge { margin-left: auto; margin-right: auto; }
 
 /* band: 타이틀을 컬러 밴드 안에 */
-.poster.v-band .head { background: var(--accent-deep); border-radius: .9em; padding: .9em 1em; }
+.poster.v-band .head { background: color-mix(in srgb, var(--head-bg-color, var(--accent-deep)) calc(var(--head-bg-alpha, 100) * 1%), transparent); border-radius: .9em; padding: .9em 1em; }
+/* 타이틀 배경 박스(밴드 외 레이아웃에서 색 지정 시) */
+.poster .head.head-box { background: color-mix(in srgb, var(--head-bg-color, var(--accent-deep)) calc(var(--head-bg-alpha, 100) * 1%), transparent); border-radius: .9em; padding: .8em 1em; }
 .poster.v-band .head .title, .poster.v-band .head .title .l2, .poster.v-band .head .sup { color: #fff !important; text-shadow: none; }
 .poster.v-band .head .script { color: rgba(255,255,255,.92) !important; }
 .poster.v-band.has-photo .head { box-shadow: 0 .4em 1.4em rgba(0,0,0,.25); }
@@ -100,11 +105,11 @@
 /* editorial: 큰 스크립트 + 작은 타이틀 + 좌측 액센트 바 */
 .poster.v-editorial .head { border-left: .22em solid var(--accent); padding-left: .7em; }
 .poster.v-editorial .script { font-size: 3.1em; }
-.poster.v-editorial .title { font-size: 1.85em; }
+.poster.v-editorial .title { font-size: calc(1.85em * var(--title-scale, 1)); }
 
 /* minimal: 스크립트 숨김, 타이틀 컴팩트, 패널 강조 */
 .poster.v-minimal .script { display: none; }
-.poster.v-minimal .title { font-size: 1.7em; font-weight: 700; }
+.poster.v-minimal .title { font-size: calc(1.7em * var(--title-scale, 1)); font-weight: 700; }
 .poster.v-minimal .body { gap: .7em; }
 
 /* ===== 타이틀 글자 효과 (그림자/3D/외곽선/글로우) — has-photo의 기본 그림자보다 우선 ===== */
@@ -120,14 +125,22 @@
 }
 .poster.has-photo.fx-outline .title, .poster.has-photo.fx-outline .title .l2, .poster.has-photo.fx-outline .script { -webkit-text-stroke-color: rgba(0,0,0,.55); }
 .poster.fx-glow .title, .poster.fx-glow .title .l2, .poster.fx-glow .script { text-shadow: 0 0 .18em var(--accent), 0 0 .4em var(--accent), 0 0 .75em var(--accent-deep) !important; }
+/* 고급 효과 */
+.poster.fx-gradient .title { background: linear-gradient(180deg, var(--accent) 0%, var(--accent-deep) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-shadow: none !important; }
+.poster.fx-gold .title { background: linear-gradient(180deg, #fcf2c4 0%, #e7c45e 46%, #b8860b 56%, #f6e6a6 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 .035em .04em rgba(0,0,0,.4)); text-shadow: none !important; }
+.poster.fx-longshadow .title, .poster.fx-longshadow .title .l2 {
+  text-shadow: .03em .03em 0 var(--accent-deep), .06em .06em 0 var(--accent-deep), .09em .09em 0 var(--accent-deep),
+    .12em .12em 0 var(--accent-deep), .15em .15em 0 var(--accent-deep), .18em .18em .04em rgba(0,0,0,.3) !important;
+}
+.poster.fx-emboss .title, .poster.fx-emboss .title .l2 { color: color-mix(in srgb, var(--ink) 80%, #fff) !important; -webkit-text-fill-color: currentColor; text-shadow: 0 .02em 0 rgba(255,255,255,.7), 0 -.015em .012em rgba(0,0,0,.4) !important; }
 
 /* ===== studio: 미니멀 에디토리얼 (좌우 분할 헤어라인 헤드라인 + 중앙 제품명 + 하단 로고) ===== */
 .poster.v-studio .top, .poster.v-studio .spk, .poster.v-studio .foot, .poster.v-studio .vat { display: none; }
 .poster.v-studio .body { padding: .4em 0 .2em; }
 .poster.v-studio .studio-head { width: 100%; }
 .poster.v-studio .hl-row { display: flex; align-items: flex-end; gap: .55em; width: 100%; }
-.poster.v-studio .hl-l { min-width: 0; word-break: keep-all; font-weight: 700; font-size: 1.55em; line-height: 1.05; letter-spacing: -.01em; }
-.poster.v-studio .hl-r { white-space: nowrap; font-weight: 700; font-size: 1.55em; line-height: 1.05; letter-spacing: -.01em; color: var(--accent-deep); }
+.poster.v-studio .hl-l { min-width: 0; word-break: keep-all; font-weight: 700; font-family: var(--title-font, "Pretendard Variable", Pretendard, sans-serif); font-size: calc(1.55em * var(--title-scale, 1)); line-height: 1.05; letter-spacing: -.01em; }
+.poster.v-studio .hl-r { white-space: nowrap; font-weight: 700; font-family: var(--title-font, "Pretendard Variable", Pretendard, sans-serif); font-size: calc(1.55em * var(--title-scale, 1)); line-height: 1.05; letter-spacing: -.01em; color: var(--accent-deep); }
 .poster.v-studio .hl-rule { flex: 1 0 .8em; height: 0; border-top: 1px solid currentColor; margin-bottom: .5em; opacity: .5; }
 .poster.v-studio .studio-head .script { font-size: 1.7em; margin-top: .3em; }
 /* 제품명: 흰 박스 제거 + 세로 중앙 + 가운데 정렬 */
@@ -148,3 +161,31 @@
   color: #fff !important; text-shadow: 0 .05em .4em rgba(0,0,0,.42);
 }
 .poster.has-photo.v-studio .hl-rule, .poster.has-photo.v-studio .studio-brand { border-color: rgba(255,255,255,.72); }
+
+/* ===== magazine: 고급 에디토리얼(세리프 + 헤어라인) ===== */
+.poster.v-magazine .head { border-top: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); padding: .6em 0; }
+.poster.v-magazine .script { font-family: "Playfair Display", serif; font-style: italic; font-size: 1.55em; margin-bottom: .1em; }
+.poster.v-magazine .sup { letter-spacing: .34em; text-transform: uppercase; font-size: .6em; }
+.poster.v-magazine .title { font-family: "Playfair Display", serif; font-weight: 700; letter-spacing: 0; font-size: calc(2.55em * var(--title-scale, 1)); }
+.poster.v-magazine .body { gap: 1.35em; }
+.poster.v-magazine .panel { box-shadow: 0 .5em 1.5em rgba(80,66,48,.1); }
+.poster.has-photo.v-magazine .head { border-color: rgba(255,255,255,.7); }
+
+/* ===== ticket: 쿠폰/티켓 ===== */
+.poster.v-ticket .panel { background: var(--panel); border: 1.5px dashed color-mix(in srgb, var(--accent) 60%, transparent); border-radius: 1.1em; box-shadow: 0 .5em 1.4em rgba(80,66,48,.12); }
+.poster.v-ticket .row { border-bottom: 1.5px dashed var(--divider); }
+.poster.v-ticket .row:last-child { border-bottom: 0; }
+.poster.v-ticket .phead { border-radius: .95em .95em 0 0; border-bottom: 1.5px dashed rgba(255,255,255,.55); }
+.poster.v-ticket .now { color: var(--accent-deep); }
+
+/* ===== sidebar: 좌측 컬러 띠 + 우측 가격표 ===== */
+.poster:not(.land).v-sidebar .body { flex-direction: row; align-items: stretch; gap: 1em; }
+.poster.v-sidebar .head { flex: 0 0 40%; background: var(--accent-deep); color: #fff; border-radius: 1em; padding: 1.1em 1em; display: flex; flex-direction: column; justify-content: center; }
+.poster.v-sidebar .head .title, .poster.v-sidebar .head .title .l2, .poster.v-sidebar .head .script, .poster.v-sidebar .head .sup, .poster.v-sidebar .head .badge { color: #fff !important; text-shadow: none; }
+.poster.v-sidebar .head .badge { background: rgba(255,255,255,.22); }
+.poster.v-sidebar .body > .panel { flex: 1; width: auto; align-self: stretch; max-height: none; }
+
+/* ===== split: 위 사진 / 아래 패널(상하 분할) ===== */
+.poster.v-split .body { justify-content: space-between; }
+.poster:not(.land).v-split .body > .panel { width: 100%; flex: 0 1 auto; align-self: stretch; max-height: calc(56% * var(--panel-hmax, 1)); border-radius: 1.3em 1.3em .45em .45em; }
+.poster.v-split .head { margin-top: .2em; }

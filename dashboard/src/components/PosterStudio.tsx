@@ -4,7 +4,7 @@ import { toPng } from "html-to-image";
 import type { RequestData } from "../lib/types";
 import { sampleData } from "../lib/sample";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
-import { THEMES, THEME_LIST, themeKeyForGroup } from "../lib/themes";
+import { THEMES, THEME_LIST, themeKeyForGroup, makeTheme, type ThemeDef } from "../lib/themes";
 import { themeBg } from "../lib/backgrounds";
 import type { Sticker } from "../lib/poster";
 import { searchStock, stockToDataUrl, type StockPhoto } from "../lib/stock";
@@ -30,12 +30,13 @@ const clamp = (v: number) => Math.max(-10, Math.min(110, v));
 const sanitize = (s: string) => s.replace(/[\\/:*?"<>|\n]/g, "").replace(/\s+/g, "").slice(0, 36);
 type Plate = { url: string; hideTitle: boolean };
 type XY = { dx: number; dy: number };
-// 마우스 드래그로 조절되는 포스터별 배치(패널/로고/타이틀 이동 + 패널 크기)
-type Layout = { panel: XY; logo: XY; head: XY; panelScale: number };
-const DEFAULT_LAYOUT: Layout = { panel: { dx: 0, dy: 0 }, logo: { dx: 0, dy: 0 }, head: { dx: 0, dy: 0 }, panelScale: 1 };
+// 마우스 드래그로 조절되는 포스터별 배치(패널/로고/타이틀/하단문구/VAT 이동 + 패널 가로·세로 크기)
+type Layout = { panel: XY; logo: XY; head: XY; foot: XY; vat: XY; bg: XY; panelScaleX: number; panelScaleY: number; bgZoom: number };
+const DEFAULT_LAYOUT: Layout = { panel: { dx: 0, dy: 0 }, logo: { dx: 0, dy: 0 }, head: { dx: 0, dy: 0 }, foot: { dx: 0, dy: 0 }, vat: { dx: 0, dy: 0 }, bg: { dx: 0, dy: 0 }, panelScaleX: 1, panelScaleY: 1, bgZoom: 1 };
 
 interface Opts {
   logoScale: number;
+  logoVariant: "auto" | "color" | "white"; // 로고 색: 자동/유색/무색(화이트)
   panelTop: number;
   panelBottom: number;
   panelWidth: number;
@@ -45,6 +46,9 @@ interface Opts {
   headerTarget: string;
   showDiscount: boolean;
   showPrice: boolean; // 가격 표시 ON/OFF
+  showVat: boolean; // 우하단 VAT 별도 표시
+  footScale: number; // 하단 안내문구 크기
+  vatScale: number; // VAT 배지 크기
   nameSize: number; // 상품명 크기 배율
   nameWeight: number; // 상품명 굵기
   priceSize: number; // 금액 크기 배율
@@ -53,13 +57,17 @@ interface Opts {
   brandSub: string; // 우상단 아랫줄
   brandFont: "sans" | "serif"; // 우상단 폰트
   brandStyle: "stack" | "line" | "hidden"; // 우상단 형식
-  titleFx: "none" | "shadow" | "lift" | "3d" | "outline" | "glow"; // 타이틀 글자 효과
+  titleFx: "none" | "shadow" | "lift" | "3d" | "outline" | "glow" | "gradient" | "gold" | "longshadow" | "emboss"; // 타이틀 글자 효과
+  titleFont: "sans" | "serif"; // 제목 폰트
+  titleScale: number; // 제목 크기 배율
+  headBg: string; // 타이틀 배경 색(빈칸=테마 기본). 밴드 레이아웃/색 지정 시 박스로 표시
+  headBgOpacity: number; // 타이틀 배경 투명도(0~100)
 }
 const DEFAULT_OPTS: Opts = {
-  logoScale: 1, panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
-  showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true,
+  logoScale: 1, logoVariant: "auto", panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
+  showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true, showVat: true, footScale: 1, vatScale: 1,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
-  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none",
+  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1, headBg: "", headBgOpacity: 100,
 };
 
 const SIZES = [
@@ -81,9 +89,17 @@ const LAYOUTS = [
   { key: "classic", label: "기본" }, { key: "center", label: "센터" }, { key: "band", label: "밴드" },
   { key: "editorial", label: "에디토리얼" }, { key: "minimal", label: "미니멀" },
   { key: "studio", label: "미니멀 에디토리얼" },
+  { key: "magazine", label: "매거진" }, { key: "ticket", label: "쿠폰/티켓" },
+  { key: "sidebar", label: "사이드바" }, { key: "split", label: "하프 분할" },
 ] as const;
 
-const PREVIEW_W = 330; // 세로형 미리보기 폭
+const TITLE_FX: { v: Opts["titleFx"]; label: string }[] = [
+  { v: "none", label: "없음" }, { v: "shadow", label: "그림자" }, { v: "lift", label: "떠있는 그림자" },
+  { v: "3d", label: "3D 입체" }, { v: "longshadow", label: "롱 섀도우" }, { v: "outline", label: "외곽선" },
+  { v: "emboss", label: "음각/양각" }, { v: "glow", label: "네온 글로우" }, { v: "gradient", label: "그라데이션" }, { v: "gold", label: "골드 ✨" },
+];
+
+const PREVIEW_W = 460; // 세로형도 한 줄에 한 장씩(컨트롤 공간 확보)
 const PREVIEW_W_LAND = 760; // 가로형은 한 줄에 한 장씩 크게
 
 export default function PosterStudio({ initialData }: { initialData?: RequestData | null }) {
@@ -101,6 +117,17 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [layouts, setLayouts] = useState<Record<number, Layout>>({});
   const [stickers, setStickers] = useState<Record<number, Sticker[]>>({});
   const [selSticker, setSelSticker] = useState<{ gi: number; id: string } | null>(null);
+  const [titleOv, setTitleOv] = useState<Record<number, { l1?: string; l2?: string }>>({});
+  const [titleEdit, setTitleEdit] = useState<number | null>(null); // 타이틀 편집 팝업 대상 gi
+  const [fxEdit, setFxEdit] = useState<{ gi: number; el: "foot" | "vat" | "logo" } | null>(null); // 로고/하단문구/VAT 편집 팝업
+  // AI 테마(런타임 생성)
+  const [aiThemes, setAiThemes] = useState<Record<string, ThemeDef>>({});
+  const [aiGi, setAiGi] = useState<number | null>(null); // AI 테마 만들기 모달 대상 gi
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiProvider, setAiProvider] = useState<"auto" | "gemini" | "claude">("auto");
+  const [aiBg, setAiBg] = useState(true); // 어울리는 배경 사진 자동 적용
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiNote, setAiNote] = useState<string | undefined>();
   const dragRef = useRef<{ gi: number; tag: string; sx: number; sy: number; scale: number; base: any } | null>(null);
   const [sizeKey, setSizeKey] = useState<string>("portrait");
   // 스톡 사진 검색
@@ -118,6 +145,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const stateRef = useRef<{ themes: Record<number, string>; plates: Record<number, Plate>; data: RequestData }>({ themes: {}, plates: {}, data: {} as RequestData });
   const [cap, setCap] = useState<{ gi: number; name: string; action: "download" | "canva" } | null>(null);
   // 캔바 연동
   const [canva, setCanva] = useState<{ configured: boolean; connected: boolean; name?: string } | null>(null);
@@ -134,27 +163,96 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     return g ? (THEMES[themeFor(gi)] || THEMES.summer).headline(g).script ?? "" : "";
   };
   const scriptFor = (gi: number) => (scripts[gi] !== undefined ? scripts[gi] : defaultScript(gi));
+  const resolveTheme = (gi: number): ThemeDef | undefined => aiThemes[themeFor(gi)]; // AI 테마면 정의 반환, 기본 테마는 undefined(키로 처리)
+  const themeOptions = [...THEME_LIST, ...Object.values(aiThemes).map((t) => ({ key: t.key, label: t.label }))];
+  async function genAiTheme() {
+    const gi = aiGi;
+    if (gi == null || !aiPrompt.trim()) return;
+    setAiLoading(true); setAiNote(undefined);
+    try {
+      const r = await fetch("/api/palette", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: aiPrompt.trim(), provider: aiProvider }) });
+      const d = await r.json().catch(() => ({}));
+      if (!d.palette) { setAiNote(d.note || `생성 실패 (${r.status})`); return; }
+      const p = d.palette;
+      const key = `ai_${uid()}`;
+      const theme = makeTheme(key, `✨ ${p.label}`, { bg: p.bg, blob: p.blob, ink: p.ink, accent: p.accent, accentDeep: p.accentDeep, script: p.scriptColor, panel: p.panel, divider: p.divider, was: p.was }, p.tag);
+      setAiThemes((m) => ({ ...m, [key]: theme }));
+      setThemes((m) => ({ ...m, [gi]: key }));
+      if (p.layout) setVariants((m) => ({ ...m, [gi]: p.layout })); // AI가 고른 레이아웃
+      if (p.titleFx) setO(gi, { titleFx: p.titleFx }); // AI가 고른 제목 효과
+      // 어울리는 배경 사진도 자동으로 찾아 적용(옵션)
+      if (aiBg && p.bgQuery) {
+        setAiNote(`색 적용됨 · "${p.bgQuery}" 배경 찾는 중…`);
+        try {
+          const res = await searchStock(p.bgQuery, size.w > size.h ? "landscape" : "portrait");
+          const ph = res.results[0];
+          if (ph) { const url = await stockToDataUrl(ph.url); setPlates((m) => ({ ...m, [gi]: { url, hideTitle: false } })); }
+        } catch { /* 배경 실패해도 색은 적용됨 */ }
+      }
+      setNotice(`AI 테마 "${p.label}" 적용됨${via(d)} ✓`);
+      setAiGi(null); setAiPrompt("");
+    } catch (e) { setAiNote(`오류: ${(e as Error).message}`); }
+    finally { setAiLoading(false); }
+  }
+  const via = (d: any) => (d?.via ? ` (${d.via === "anthropic" ? "Claude" : "Gemini"})` : "");
   const O = (gi: number): Opts => ({ ...DEFAULT_OPTS, ...(opts[gi] || {}) });
   const setO = (gi: number, patch: Partial<Opts>) => setOpts((m) => ({ ...m, [gi]: { ...DEFAULT_OPTS, ...(m[gi] || {}), ...patch } }));
 
-  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setLayouts({}); setStickers({}); setSelSticker(null); }, [data]);
+  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setLayouts({}); setStickers({}); setSelSticker(null); setTitleOv({}); setTitleEdit(null); setFxEdit(null); setAiThemes({}); setAiGi(null); }, [data]);
   const L = (gi: number): Layout => ({ ...DEFAULT_LAYOUT, ...(layouts[gi] || {}) });
   const setL = (gi: number, patch: Partial<Layout>) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT, ...(m[gi] || {}), ...patch } }));
+  const lastTapRef = useRef<{ gi: number; tag: string; t: number } | null>(null); // 더블탭 감지용
+  stateRef.current = { themes, plates, data };
+  // 배경 휠 줌(원래 비율 유지). 페이지 스크롤을 막으려면 passive:false 네이티브 리스너 필요
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const t = (e.target as HTMLElement).closest("[data-gi]") as HTMLElement | null;
+      if (!t) return;
+      const gi = Number(t.getAttribute("data-gi"));
+      const st = stateRef.current;
+      const tk = st.themes[gi] ?? themeKeyForGroup(st.data.groups[gi]?.group ?? "");
+      if (!(st.plates[gi] || themeBg(tk))) return; // 배경 사진이 있을 때만
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+      setLayouts((m) => {
+        const cur = { ...DEFAULT_LAYOUT, ...(m[gi] || {}) };
+        return { ...m, [gi]: { ...cur, bgZoom: Math.max(1, Math.min(3, cur.bgZoom * factor)) } };
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   // 마우스 드래그(패널/로고/타이틀 이동 · 패널 크기 · 스티커 이동)
   function onDragStart(gi: number, e: React.PointerEvent) {
     const el = (e.target as HTMLElement).closest("[data-drag]") as HTMLElement | null;
-    if (!el) return;
-    const tag = el.getAttribute("data-drag")!;
+    // 빈 영역 클릭 → 배경 이동(배경 사진이 있을 때만)
+    const tag = el ? el.getAttribute("data-drag")! : ((plates[gi] || themeBg(themeFor(gi))) ? "bg" : null);
+    if (!tag) return;
     const scale = previewW / size.w;
+    // 더블탭 → 편집 팝업 (드래그용 preventDefault가 네이티브 dblclick을 막으므로 수동 감지)
+    if (tag === "head" || tag === "foot" || tag === "vat" || tag === "logo") {
+      const now = Date.now();
+      const lt = lastTapRef.current;
+      if (lt && lt.gi === gi && lt.tag === tag && now - lt.t < 350) {
+        lastTapRef.current = null;
+        if (tag === "head") setTitleEdit(gi); else setFxEdit({ gi, el: tag as "foot" | "vat" | "logo" });
+        return;
+      }
+      lastTapRef.current = { gi, tag, t: now };
+    }
     if (tag.startsWith("s:")) {
       const id = tag.slice(2);
       const st = (stickers[gi] || []).find((s) => s.id === id);
       if (!st) return;
       dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { x: st.x, y: st.y } };
       setSelSticker({ gi, id });
-    } else if (tag === "panel-size") {
-      dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { s: L(gi).panelScale } };
+    } else if (tag === "panel-size-x") {
+      dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { s: L(gi).panelScaleX } };
+    } else if (tag === "panel-size-y") {
+      dragRef.current = { gi, tag, sx: e.clientX, sy: e.clientY, scale, base: { s: L(gi).panelScaleY } };
     } else {
       // panel | logo | head
       const cur = (L(gi) as any)[tag] as XY;
@@ -173,14 +271,23 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       const x = clamp(d.base.x + (dxp / size.w) * 100);
       const y = clamp(d.base.y + (dyp / size.h) * 100);
       setStickers((m) => ({ ...m, [d.gi]: (m[d.gi] || []).map((s) => (s.id === id ? { ...s, x, y } : s)) }));
-    } else if (d.tag === "panel-size") {
-      const s = Math.max(0.6, Math.min(1.8, d.base.s + dyp / 500)); // 아래로 끌면 커지고 위로 끌면 작아짐
-      setL(d.gi, { panelScale: s });
+    } else if (d.tag === "panel-size-x") {
+      const s = Math.max(0.45, Math.min(1, d.base.s + dxp / 420)); // 우측 핸들을 안쪽으로 끌면 박스만 좁아짐(글자 크기 불변)
+      setL(d.gi, { panelScaleX: s });
+    } else if (d.tag === "panel-size-y") {
+      const s = Math.max(0.45, Math.min(1, d.base.s + dyp / 420)); // 하단 핸들을 위로 끌면 박스만 낮아짐(글자 크기 불변)
+      setL(d.gi, { panelScaleY: s });
     } else {
       setL(d.gi, { [d.tag]: { dx: d.base.dx + dxp, dy: d.base.dy + dyp } } as Partial<Layout>);
     }
   }
   const onDragEnd = () => { dragRef.current = null; };
+  // 타이틀(헤드라인) 더블클릭 → 편집 팝업
+  function onTitleDblClick(gi: number, e: React.MouseEvent) {
+    if ((e.target as HTMLElement).closest('[data-drag="head"]')) setTitleEdit(gi);
+  }
+  const titleDefault = (gi: number) => (THEMES[themeFor(gi)] || THEMES.summer).headline(data.groups[gi]);
+  const setTitleLine = (gi: number, key: "l1" | "l2", v: string) => setTitleOv((m) => ({ ...m, [gi]: { ...m[gi], [key]: v } }));
 
   const addSticker = (gi: number, char: string, badge = false) => {
     const size = char.startsWith("img:") ? 7 : char.startsWith("svg:") ? 4.5 : badge ? 1.5 : 2.6;
@@ -339,15 +446,19 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     const plate = plates[gi];
     const o = O(gi);
     return {
-      group: data.groups[gi], themeKey: themeFor(gi), sheet: data.sheet, width: size.w, height: size.h,
+      group: data.groups[gi], themeKey: themeFor(gi), themeDef: resolveTheme(gi), sheet: data.sheet, width: size.w, height: size.h,
       bgUrl: plate?.url, photoBg: !plate ? themeBg(themeFor(gi)) : undefined, hideTitle: plate?.hideTitle,
-      logoScale: o.logoScale, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
+      logoScale: o.logoScale, logoVariant: o.logoVariant, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount, showPrice: o.showPrice,
+      showVat: o.showVat, footScale: o.footScale, vatScale: o.vatScale,
       nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
-      brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle, titleFx: o.titleFx,
-      panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScale: L(gi).panelScale,
+      brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle,
+      titleFx: o.titleFx, titleFont: o.titleFont, titleScale: o.titleScale, headBg: o.headBg, headBgOpacity: o.headBgOpacity, l1Override: titleOv[gi]?.l1, l2Override: titleOv[gi]?.l2,
+      panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScaleX: L(gi).panelScaleX, panelScaleY: L(gi).panelScaleY,
       logoDx: L(gi).logo.dx, logoDy: L(gi).logo.dy, headDx: L(gi).head.dx, headDy: L(gi).head.dy,
+      footDx: L(gi).foot.dx, footDy: L(gi).foot.dy, vatDx: L(gi).vat.dx, vatDy: L(gi).vat.dy,
+      bgDx: L(gi).bg.dx, bgDy: L(gi).bg.dy, bgZoom: L(gi).bgZoom,
       stickers: stickers[gi] || [],
     };
   };
@@ -387,31 +498,40 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         {notice && <p className="mt-2 text-sm text-emerald-700">{notice}</p>}
       </div>
 
-      <div className={land ? "grid justify-items-center gap-7 grid-cols-1" : "grid gap-7 md:grid-cols-2 xl:grid-cols-3"}>
+      <div ref={gridRef} className="grid justify-items-center gap-7 grid-cols-1">
         {data.groups.map((g, gi) => {
           const plate = plates[gi];
           const o = O(gi);
           return (
             <div key={gi} className="flex flex-col items-center gap-2.5">
-              <div style={{ ...previewWrap(size.w, size.h), touchAction: "none", cursor: "grab" }}
-                onPointerDown={(e) => onDragStart(gi, e)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}>
+              <div data-gi={gi} style={{ ...previewWrap(size.w, size.h), touchAction: "none", cursor: "grab" }}
+                onPointerDown={(e) => onDragStart(gi, e)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}
+                onDoubleClick={(e) => onTitleDblClick(gi, e)} title="배경 위에서 마우스 휠로 확대/축소 · 끌어서 위치 · 타이틀 더블클릭 편집">
                 <div style={previewInner}><Poster {...posterProps(gi)} /></div>
               </div>
 
               <div className="flex items-center gap-1.5" style={{ width: previewW }}>
+                <span className="shrink-0 text-[11px] font-medium text-charcoal/55">테마</span>
                 {!plate ? (
-                  <select value={themeFor(gi)} onChange={(e) => setThemes((m) => ({ ...m, [gi]: e.target.value }))} className="min-w-0 flex-1 rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
-                    {THEME_LIST.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-                  </select>
+                  <>
+                    <select value={themeFor(gi)} onChange={(e) => setThemes((m) => ({ ...m, [gi]: e.target.value }))} className="min-w-0 flex-1 rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
+                      {themeOptions.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                    </select>
+                    <button onClick={() => { setAiGi(gi); setAiPrompt(""); setAiNote(undefined); }} title="AI로 색·레이아웃·배경 자동 디자인" className="shrink-0 rounded-md border border-taupe/40 px-2 py-1.5 text-xs text-taupe-deep hover:bg-taupe/10">✨AI</button>
+                  </>
                 ) : (
                   <label className="flex min-w-0 flex-1 items-center gap-1 rounded-md border border-taupe/30 bg-white px-1.5 py-1.5 text-xs text-charcoal/75">
                     <input type="checkbox" checked={plate.hideTitle} onChange={() => toggleHide(gi)} className="accent-taupe" />타이틀 숨김
                   </label>
                 )}
-                <select value={variantFor(gi)} onChange={(e) => setVariants((m) => ({ ...m, [gi]: e.target.value }))} title="레이아웃" className="rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
+              </div>
+
+              <div className="flex items-center gap-1.5" style={{ width: previewW }}>
+                <span className="shrink-0 text-[11px] font-medium text-charcoal/55">레이아웃</span>
+                <select value={variantFor(gi)} onChange={(e) => setVariants((m) => ({ ...m, [gi]: e.target.value }))} className="min-w-0 flex-1 rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
                   {LAYOUTS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}
                 </select>
-                <button onClick={() => downloadOne(gi)} className="rounded-md bg-taupe px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-taupe-deep">PNG</button>
+                <button onClick={() => downloadOne(gi)} className="shrink-0 rounded-md bg-taupe px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-taupe-deep">PNG</button>
               </div>
 
               <div className="flex items-center gap-2" style={{ width: previewW }}>
@@ -444,6 +564,14 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   <label className="flex items-center gap-2">패널 하단<input type="range" min={0} max={14} step={0.5} value={o.panelBottom} onChange={(e) => setO(gi, { panelBottom: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelBottom}</span></label>
                   <label className="flex items-center gap-2">패널 너비<input type="range" min={40} max={100} step={2} value={o.panelWidth} onChange={(e) => setO(gi, { panelWidth: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{o.panelWidth}%</span></label>
 
+                  {(plates[gi] || themeBg(themeFor(gi))) && (
+                    <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
+                      <div className="font-medium text-charcoal/60">배경 사진</div>
+                      <label className="flex items-center gap-2">확대<input type="range" min={1} max={3} step={0.02} value={L(gi).bgZoom} onChange={(e) => setL(gi, { bgZoom: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(L(gi).bgZoom * 100)}%</span></label>
+                      <div className="text-[10px] text-charcoal/40">미리보기에서 배경(빈 영역)을 끌어 위치를 옮기세요. 고해상도 사진은 부분 확대해도 또렷합니다.</div>
+                    </div>
+                  )}
+
                   <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
                     <div className="font-medium text-charcoal/60">패널 글자 (하얀 박스 안)</div>
                     <label className="flex items-center gap-2">상품명 크기<input type="range" min={0.7} max={1.5} step={0.05} value={o.nameSize} onChange={(e) => setO(gi, { nameSize: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.nameSize * 100)}%</span></label>
@@ -463,12 +591,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   <div className="flex items-center gap-2 rounded border border-taupe/15 bg-white/60 p-2">
                     <span className="font-medium text-charcoal/60">타이틀 효과</span>
                     <select value={o.titleFx} onChange={(e) => setO(gi, { titleFx: e.target.value as Opts["titleFx"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
-                      <option value="none">없음</option>
-                      <option value="shadow">그림자</option>
-                      <option value="lift">떠있는 그림자</option>
-                      <option value="3d">3D 입체</option>
-                      <option value="outline">외곽선</option>
-                      <option value="glow">네온 글로우</option>
+                      {TITLE_FX.map((f) => <option key={f.v} value={f.v}>{f.label}</option>)}
                     </select>
                   </div>
 
@@ -488,6 +611,14 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showDiscount} onChange={(e) => setO(gi, { showDiscount: e.target.checked })} className="accent-taupe" />할인율</label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showHeader} onChange={(e) => setO(gi, { showHeader: e.target.checked })} className="accent-taupe" />헤더바</label>
                   </div>
+
+                  <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
+                    <div className="flex items-center justify-between"><span className="font-medium text-charcoal/60">하단 문구</span><label className="flex items-center gap-1"><input type="checkbox" checked={o.showVat} onChange={(e) => setO(gi, { showVat: e.target.checked })} className="accent-taupe" />VAT 별도</label></div>
+                    <label className="flex items-center gap-2">부가세 문구 크기<input type="range" min={0.6} max={1.8} step={0.05} value={o.footScale} onChange={(e) => setO(gi, { footScale: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.footScale * 100)}%</span></label>
+                    <label className="flex items-center gap-2">VAT 크기<input type="range" min={0.6} max={1.8} step={0.05} value={o.vatScale} onChange={(e) => setO(gi, { vatScale: Number(e.target.value) })} className="flex-1 accent-taupe" disabled={!o.showVat} /><span className="w-9 text-right tabular-nums">{Math.round(o.vatScale * 100)}%</span></label>
+                    <div className="text-[10px] text-charcoal/40">미리보기에서 두 문구를 마우스로 끌어 옮길 수 있어요.</div>
+                  </div>
+
                   {o.showHeader && (
                     <div className="space-y-1">
                       <input value={o.headerPeriod} onChange={(e) => setO(gi, { headerPeriod: e.target.value })} placeholder="기간 (예: 2026.08.01~08.31)" className="w-full rounded border border-taupe/30 px-2 py-1" />
@@ -539,7 +670,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                         </div>
                       );
                     })()}
-                    <div className="mt-1 text-[10px] text-charcoal/40">💡 미리보기에서 <b>로고·타이틀·패널·스티커</b>를 마우스로 끌어 옮기고, 패널 <b>아래 가장자리</b>를 위/아래로 끌면 크기가 바뀝니다.</div>
+                    <div className="mt-1 text-[10px] text-charcoal/40">💡 미리보기에서 <b>로고·타이틀·패널·스티커</b>를 마우스로 끌어 옮기고, 패널 <b>아래 가장자리</b>를 위/아래로 끌면 크기가 바뀝니다. <b>타이틀을 더블클릭</b>하면 글자·폰트·크기·효과를 바꿀 수 있어요.</div>
                   </div>
                 </div>
               )}
@@ -597,6 +728,136 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
           </div>
         </div>
       )}
+
+      {fxEdit && (() => {
+        const gi = fxEdit.gi, o = O(gi), el = fxEdit.el;
+        const title = el === "logo" ? "로고" : el === "foot" ? "부가세 문구" : "VAT 별도";
+        const cur = el === "logo" ? o.logoScale : el === "foot" ? o.footScale : o.vatScale;
+        const setScale = (v: number) => setO(gi, el === "logo" ? { logoScale: v } : el === "foot" ? { footScale: v } : { vatScale: v });
+        return (
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setFxEdit(null)}>
+            <div className="mt-20 w-full max-w-xs rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-serif text-base text-taupe-deep">{title} 편집</h3>
+                <button onClick={() => setFxEdit(null)} className="rounded-md border border-taupe/30 px-3 py-1 text-sm text-charcoal/70">닫기</button>
+              </div>
+              <div className="space-y-3 text-sm">
+                {el === "vat" && (
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={o.showVat} onChange={(e) => setO(gi, { showVat: e.target.checked })} className="accent-taupe" />VAT 별도 표시</label>
+                )}
+                {el === "logo" && (
+                  <label className="flex items-center gap-2">색상
+                    <select value={o.logoVariant} onChange={(e) => setO(gi, { logoVariant: e.target.value as Opts["logoVariant"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
+                      <option value="auto">자동 (사진 위 흰색)</option><option value="color">유색 (컬러)</option><option value="white">무색 (화이트)</option>
+                    </select>
+                  </label>
+                )}
+                <label className="flex items-center gap-2">크기
+                  <input type="range" min={0.6} max={el === "logo" ? 3 : 1.8} step={0.05} value={cur} onChange={(e) => setScale(Number(e.target.value))} className="flex-1 accent-taupe" disabled={el === "vat" && !o.showVat} />
+                  <span className="w-10 text-right tabular-nums">{Math.round(cur * 100)}%</span>
+                </label>
+                <p className="text-[11px] text-charcoal/45">미리보기에서 끌어 위치도 옮길 수 있어요.</p>
+                <div className="flex justify-end"><button onClick={() => setFxEdit(null)} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep">완료</button></div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {aiGi !== null && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setAiGi(null)}>
+          <div className="mt-16 w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="font-serif text-lg text-taupe-deep">✨ AI 자동 디자인</h3>
+              <button onClick={() => setAiGi(null)} className="rounded-md border border-taupe/30 px-3 py-1 text-sm text-charcoal/70">닫기</button>
+            </div>
+            <p className="mb-2 text-xs text-charcoal/55">원하는 분위기를 적으면 AI가 <b>색·레이아웃·제목 효과</b>를 골라 이 포스터에 적용하고, 어울리는 <b>배경 사진</b>도 찾아 넣어줍니다.</p>
+            <div className="mb-2 flex flex-wrap gap-1">
+              {["고급스러운 가을 버건디", "청량한 여름 민트", "우아한 로즈골드", "미니멀 모노톤", "따뜻한 베이지 내추럴", "프리미엄 네이비 골드"].map((q) => (
+                <button key={q} onClick={() => setAiPrompt(q)} className="rounded-full border border-taupe/30 px-2 py-0.5 text-[11px] text-charcoal/65 hover:bg-taupe/10">{q}</button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && genAiTheme()} placeholder="예: 고급스러운 가을 버건디 느낌" className="min-w-0 flex-1 rounded-md border border-taupe/30 px-3 py-1.5 text-sm" />
+              <button onClick={genAiTheme} disabled={aiLoading || !aiPrompt.trim()} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep disabled:opacity-50">{aiLoading ? "디자인 중…" : "디자인"}</button>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-charcoal/70">
+              <label className="flex items-center gap-1">AI 모델
+                <select value={aiProvider} onChange={(e) => setAiProvider(e.target.value as any)} className="rounded border border-taupe/40 bg-white px-1 py-0.5">
+                  <option value="auto">자동</option><option value="gemini">구글 Gemini</option><option value="claude">Claude</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-1"><input type="checkbox" checked={aiBg} onChange={(e) => setAiBg(e.target.checked)} className="accent-taupe" />어울리는 배경 사진도 적용</label>
+            </div>
+            {aiNote && <p className="mt-2 text-xs text-charcoal/50">{aiNote}</p>}
+          </div>
+        </div>
+      )}
+
+      {titleEdit !== null && (() => {
+        const gi = titleEdit;
+        const o = O(gi);
+        const def = titleDefault(gi);
+        const ov = titleOv[gi] || {};
+        const l1 = ov.l1 !== undefined ? ov.l1 : def.l1;
+        const l2 = ov.l2 !== undefined ? ov.l2 : (def.l2 || "");
+        return (
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setTitleEdit(null)}>
+            <div className="mt-16 w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-serif text-lg text-taupe-deep">타이틀 편집</h3>
+                <button onClick={() => setTitleEdit(null)} className="rounded-md border border-taupe/30 px-3 py-1 text-sm text-charcoal/70">닫기</button>
+              </div>
+              <div className="space-y-3 text-sm">
+                <label className="block">
+                  <span className="text-xs text-charcoal/55">윗줄 (영문 스크립트, 빈칸=숨김)</span>
+                  <input value={scriptFor(gi)} onChange={(e) => setScripts((m) => ({ ...m, [gi]: e.target.value }))} placeholder="예: Early Summer" className="mt-1 w-full rounded-md border border-taupe/30 px-2 py-1.5" />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-charcoal/55">제목 1줄</span>
+                  <input value={l1} onChange={(e) => setTitleLine(gi, "l1", e.target.value)} className="mt-1 w-full rounded-md border border-taupe/30 px-2 py-1.5" />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-charcoal/55">제목 2줄 (빈칸=숨김)</span>
+                  <input value={l2} onChange={(e) => setTitleLine(gi, "l2", e.target.value)} className="mt-1 w-full rounded-md border border-taupe/30 px-2 py-1.5" />
+                </label>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1">폰트
+                    <select value={o.titleFont} onChange={(e) => setO(gi, { titleFont: e.target.value as Opts["titleFont"] })} className="rounded border border-taupe/40 bg-white px-1 py-0.5">
+                      <option value="sans">산세리프</option><option value="serif">세리프</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-1 items-center gap-1">효과
+                    <select value={o.titleFx} onChange={(e) => setO(gi, { titleFx: e.target.value as Opts["titleFx"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
+                      {TITLE_FX.map((f) => <option key={f.v} value={f.v}>{f.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <label className="flex items-center gap-2">크기
+                  <input type="range" min={0.6} max={1.8} step={0.05} value={o.titleScale} onChange={(e) => setO(gi, { titleScale: Number(e.target.value) })} className="flex-1 accent-taupe" />
+                  <span className="w-10 text-right tabular-nums">{Math.round(o.titleScale * 100)}%</span>
+                </label>
+                <div className="space-y-2 rounded border border-taupe/15 bg-ivory/50 p-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-charcoal/60">타이틀 배경</span>
+                    <input type="color" value={o.headBg || "#27408b"} onChange={(e) => setO(gi, { headBg: e.target.value })} className="h-6 w-9 cursor-pointer rounded border border-taupe/30" />
+                    <button onClick={() => setO(gi, { headBg: "" })} className="text-[11px] text-charcoal/55 hover:underline">테마색</button>
+                    <span className="ml-auto text-[10px] text-charcoal/40">밴드/색 지정 시 적용</span>
+                  </div>
+                  <label className="flex items-center gap-2">투명도
+                    <input type="range" min={0} max={100} step={1} value={o.headBgOpacity} onChange={(e) => setO(gi, { headBgOpacity: Number(e.target.value) })} className="flex-1 accent-taupe" />
+                    <span className="w-9 text-right tabular-nums">{o.headBgOpacity}%</span>
+                  </label>
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <button onClick={() => { setTitleOv((m) => { const n = { ...m }; delete n[gi]; return n; }); setScripts((m) => { const n = { ...m }; delete n[gi]; return n; }); setO(gi, { titleFont: "sans", titleScale: 1, titleFx: "none", headBg: "", headBgOpacity: 100 }); }} className="text-xs text-charcoal/55 hover:underline">기본값으로 되돌리기</button>
+                  <button onClick={() => setTitleEdit(null)} className="rounded-md bg-taupe px-4 py-1.5 text-sm font-semibold text-white hover:bg-taupe-deep">완료</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ position: "fixed", left: -30000, top: 0, pointerEvents: "none" }} aria-hidden>
         {cap && <Poster ref={captureRef} {...posterProps(cap.gi)} />}

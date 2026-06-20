@@ -2,16 +2,16 @@
 // 입력 시술 풀 안에서만 조합. 출력: [{title, items:[시술명]}]
 import { costUsd } from "./_pricing";
 
-function buildPrompt(month: string, pool: string[], examples: string[], description: string): string {
+function buildPrompt(month: string, pool: string[], examples: string[], description: string, eventCount: number, itemsText: string): string {
   return `너는 대구 수성구 피부과 "뷰티파크의원 범어점"의 마케팅 기획자다.
-${month} 이벤트로 쓸 **패키지(이벤트 그룹)** 5~6개를 제안해라.
+${month} 이벤트로 쓸 **패키지(이벤트 그룹)** ${eventCount}개를 제안해라.
 
 [보유 시술 풀 — 반드시 이 안에서 골라 조합. 보유하지 않은 새 장비/시술을 지어내지 말 것]
 ${pool.slice(0, 80).map((t) => `- ${t}`).join("\n")}
 
 ${examples.length ? `[우리 과거 이벤트 타이틀 — 작명 톤 참고]\n${examples.slice(0, 12).map((e) => `- ${e}`).join("\n")}\n` : ""}${description ? `[기획 의도] ${description}\n` : ""}
 가이드:
-- 각 그룹 = 매력적인 한국어 타이틀 + 한 줄 콘셉트 + 시너지 있는 시술 2~5개 조합 + 타겟 + 강도(약/중/중상/상).
+- 각 그룹 = 매력적인 한국어 타이틀 + 한 줄 콘셉트 + 시너지 있는 시술 ${itemsText} 조합 + 타겟 + 강도(약/중/중상/상).
 - ${month.split(".")[1] || ""}월 계절감 반영(예: 자외선 후 미백/진정, 탄력 리프팅, 모공·피지, 바디, 평일 화수목 한정, 카톡 플친 전용 미끼).
 - 시술명은 풀의 표현을 최대한 그대로 사용(조합 시 '+'로 연결 가능).
 - 과장·치료효과 보장 표현 금지.
@@ -39,7 +39,8 @@ function parseGroups(text: string): any[] {
 }
 
 const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-flash-latest"];
-const CLAUDE_DEFAULT = "claude-haiku-4-5";
+// 유효한 Claude 모델 ID 폴백(바 형태 haiku id가 거부되는 경우 대비)
+const CLAUDE_FALLBACKS = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"];
 
 type Call = { text: string | null; err: string; model: string; inTok: number; outTok: number };
 
@@ -62,7 +63,8 @@ async function callGemini(key: string, prompt: string, preferred?: string): Prom
 }
 
 async function callAnthropic(key: string, prompt: string, preferred?: string): Promise<Call> {
-  const models = Array.from(new Set([preferred, CLAUDE_DEFAULT].filter(Boolean) as string[]));
+  const pref = preferred === "claude-haiku-4-5" ? "claude-haiku-4-5-20251001" : preferred; // 날짜 없는 haiku id 보정
+  const models = Array.from(new Set([pref, ...CLAUDE_FALLBACKS].filter(Boolean) as string[]));
   let err = "";
   for (const model of models) {
     try {
@@ -83,6 +85,12 @@ async function callAnthropic(key: string, prompt: string, preferred?: string): P
 
 export default async function handler(req: any, res: any) {
   if (req.method === "GET") {
+    // 진단: /api/packages?test=claude → 실제 Claude 호출 결과(에러 포함) 보고
+    if (req.query?.test === "claude" && process.env.ANTHROPIC_API_KEY) {
+      const a = await callAnthropic(process.env.ANTHROPIC_API_KEY, "Reply with the single word: OK");
+      res.status(200).json({ test: "claude", ok: !!a.text, model: a.model, err: a.err });
+      return;
+    }
     res.status(200).json({ ok: true, providers: { gemini: !!process.env.GEMINI_API_KEY, anthropic: !!process.env.ANTHROPIC_API_KEY } });
     return;
   }
@@ -98,6 +106,9 @@ export default async function handler(req: any, res: any) {
   const pool: string[] = Array.isArray(body?.treatments) ? body.treatments.filter((t: any) => typeof t === "string") : [];
   const examples: string[] = Array.isArray(body?.examples) ? body.examples.filter((e: any) => typeof e === "string") : [];
   const description: string = body?.description || "";
+  const eventCount = Math.max(1, Math.min(12, Math.round(Number(body?.eventCount)) || 6));
+  const itemsPer = Math.max(0, Math.min(6, Math.round(Number(body?.itemsPerEvent)) || 0));
+  const itemsText = itemsPer ? `정확히 ${itemsPer}개씩` : "2~4개";
 
   const useG = (provider === "auto" || provider === "gemini") && gemini;
   const useA = (provider === "auto" || provider === "claude") && anthropic;
@@ -106,12 +117,12 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const prompt = buildPrompt(month, pool, examples, description);
+  const prompt = buildPrompt(month, pool, examples, description, eventCount, itemsText);
   let text: string | null = null, via = "", usedModel = "", diag = "";
   let inTok = 0, outTok = 0;
   if (useG) { const g = await callGemini(gemini!, prompt, model); if (g.text) { text = g.text; via = "gemini"; usedModel = g.model; inTok = g.inTok; outTok = g.outTok; } else diag += `G(${g.err}) `; }
   if (!text && useA) { const a = await callAnthropic(anthropic!, prompt, model); if (a.text) { text = a.text; via = "anthropic"; usedModel = a.model; inTok = a.inTok; outTok = a.outTok; } else diag += `A(${a.err})`; }
 
   if (!text) { res.status(200).json({ groups: [], note: `AI 실패: ${diag.slice(0, 200)}` }); return; }
-  res.status(200).json({ groups: parseGroups(text), via, model: usedModel, usage: { input: inTok, output: outTok }, cost: costUsd(usedModel, inTok, outTok) });
+  res.status(200).json({ groups: parseGroups(text).slice(0, eventCount), via, model: usedModel, usage: { input: inTok, output: outTok }, cost: costUsd(usedModel, inTok, outTok) });
 }
