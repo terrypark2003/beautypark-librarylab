@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { RequestData } from "./lib/types";
 import PlanningView from "./components/PlanningView";
 import PosterStudio from "./components/PosterStudio";
 import EventHub from "./components/EventHub";
 import { BrandPanel, ChannelsPanel, CalendarPanel, ChecklistPanel } from "./components/Panels";
 import CostMeter from "./components/CostMeter";
+import Login from "./components/Login";
+import AdminPanel from "./components/AdminPanel";
+import { fetchMe, type Me } from "./lib/auth";
 
 const FLOW = [
   { id: "plan", label: "① 이벤트 기획", hint: "히스토리 참고" },
@@ -18,18 +21,26 @@ const REF = [
   { id: "checklist", label: "인수인계", hint: "체크리스트" },
 ] as const;
 
-type TabId = (typeof FLOW)[number]["id"] | (typeof REF)[number]["id"];
+type TabId = (typeof FLOW)[number]["id"] | (typeof REF)[number]["id"] | "admin";
 
 export default function App() {
+  const [me, setMe] = useState<Me | null>(null); // null = 로딩 중
   const [tab, setTab] = useState<TabId>("plan");
   const [planData, setPlanData] = useState<RequestData | null>(null);
+
+  useEffect(() => { fetchMe().then(setMe); }, []);
+  const reload = () => fetchMe().then(setMe);
+  async function logout() { await fetch("/api/auth?action=logout", { method: "POST" }).catch(() => {}); reload(); }
+
+  if (me === null) return <div className="flex min-h-screen items-center justify-center bg-ivory text-sm text-charcoal/50">불러오는 중…</div>;
+  if (me.configured && !me.user) return <Login onAuthed={reload} />;
+  if (me.configured && me.user?.mustSet) return <Login initialMode="setpw" onAuthed={reload} />;
+  const isAdmin = me.user?.role === "admin";
 
   const NavBtn = ({ id, label, hint }: { id: TabId; label: string; hint: string }) => (
     <button
       onClick={() => setTab(id)}
-      className={`whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition ${
-        tab === id ? "bg-taupe text-white" : "text-charcoal/70 hover:bg-taupe/10"
-      }`}
+      className={`whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition ${tab === id ? "bg-taupe text-white" : "text-charcoal/70 hover:bg-taupe/10"}`}
     >
       <div className="font-medium">{label}</div>
       <div className={`text-xs ${tab === id ? "text-white/70" : "text-charcoal/40"}`}>{hint}</div>
@@ -48,7 +59,18 @@ export default function App() {
           {FLOW.map((t) => <NavBtn key={t.id} {...t} />)}
           <div className="px-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-charcoal/35">참고자료</div>
           {REF.map((t) => <NavBtn key={t.id} {...t} />)}
+          {isAdmin && (
+            <>
+              <div className="px-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-charcoal/35">관리</div>
+              <NavBtn id="admin" label="🛠 관리자" hint="직원 · 사용 로그" />
+            </>
+          )}
         </nav>
+        {me.user && (
+          <div className="px-4 pb-3 text-xs text-charcoal/55">
+            로그인: <b className="text-charcoal/75">{me.user.name}</b>{isAdmin && " (대표)"} · <button onClick={logout} className="text-taupe-deep hover:underline">로그아웃</button>
+          </div>
+        )}
         <CostMeter />
       </aside>
 
@@ -61,6 +83,7 @@ export default function App() {
           {tab === "channels" && <ChannelsPanel />}
           {tab === "calendar" && <CalendarPanel />}
           {tab === "checklist" && <ChecklistPanel />}
+          {tab === "admin" && (isAdmin ? <AdminPanel /> : null)}
         </div>
       </main>
     </div>
