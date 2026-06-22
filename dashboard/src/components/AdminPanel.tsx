@@ -11,6 +11,9 @@ export default function AdminPanel() {
   const [phone, setPhone] = useState("");
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState("");
+  const [bulk, setBulk] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState("");
 
   const loadEmps = () => fetch("/api/auth?action=employees", { cache: "no-store" }).then((r) => r.json()).then((d) => setEmps(d.employees || [])).catch(() => {});
   const loadLogs = () => fetch("/api/auth?action=logs", { cache: "no-store" }).then((r) => r.json()).then((d) => setLogs(d.logs || [])).catch(() => {});
@@ -22,6 +25,26 @@ export default function AdminPanel() {
     setMsg("");
     await fetch("/api/auth?action=employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), phone: ph }) });
     setName(""); setPhone(""); loadEmps();
+  }
+  // "이름 전화번호" 형식 한 줄당 1명. 쉼표·탭·공백 구분 모두 허용.
+  function parseRoster(text: string): { name: string; phone: string }[] {
+    return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((line) => {
+      const m = line.match(/([0-9][0-9\-\s]{3,}[0-9])\s*$/); // 줄 끝의 전화번호
+      if (m && m.index !== undefined) return { name: line.slice(0, m.index).replace(/[\s,]+$/, "").trim(), phone: m[1] };
+      const parts = line.split(/[,\t]+|\s{2,}|\s+/);
+      const phone = parts.pop() || "";
+      return { name: parts.join(" ").trim(), phone };
+    }).filter((r) => r.name && r.phone);
+  }
+  async function addBulk() {
+    const list = parseRoster(bulk);
+    if (!list.length) { setBulkMsg("인식된 직원이 없습니다. 한 줄에 '이름 010-0000-0000' 형식으로 입력하세요."); return; }
+    setBulkMsg("등록 중…");
+    const r = await fetch("/api/auth?action=employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "bulk", list }) }).then((x) => x.json()).catch(() => null);
+    if (!r) { setBulkMsg("등록 실패(네트워크/저장소 오류)"); return; }
+    setBulkMsg(`${r.added}명 추가 완료${r.skipped?.length ? ` · 건너뜀 ${r.skipped.length}명 (${r.skipped.join(", ")})` : ""}`);
+    if (r.added) setBulk("");
+    loadEmps();
   }
   async function del(id: string, nm: string) { if (!confirm(`${nm} 직원을 삭제할까요?`)) return; await fetch("/api/auth?action=employees", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); loadEmps(); }
   async function reset(id: string, nm: string) { if (!confirm(`${nm}의 비밀번호를 초기화할까요? (초기 비번 = 전화 뒤 4자리)`)) return; await fetch("/api/auth?action=employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reset", id }) }); loadEmps(); }
@@ -51,6 +74,22 @@ export default function AdminPanel() {
             {msg && <span className="text-xs text-red-600">{msg}</span>}
           </div>
           <p className="mb-2 text-[11px] text-charcoal/45">추가하면 초기 비밀번호는 전화번호 뒤 4자리입니다. 직원이 첫 로그인 때 새 비밀번호를 설정합니다.</p>
+
+          <div className="mb-3">
+            <button onClick={() => setBulkOpen((v) => !v)} className="text-xs font-medium text-taupe-deep hover:underline">{bulkOpen ? "▾" : "▸"} 여러 명 한 번에 추가 (붙여넣기)</button>
+            {bulkOpen && (
+              <div className="mt-2 rounded-lg border border-taupe/20 bg-ivory/60 p-3">
+                <p className="mb-1.5 text-[11px] text-charcoal/55">한 줄에 한 명씩 <b>이름 전화번호</b> 형식으로 붙여넣으세요. (예: <code>최현진 010-5728-7263</code>) 쉼표·탭으로 구분해도 됩니다.</p>
+                <textarea value={bulk} onChange={(e) => setBulk(e.target.value)} rows={6} placeholder={"홍길동 010-1234-5678\n김영희 010-2345-6789"} className="block w-full rounded-md border border-taupe/30 px-2 py-1.5 font-mono text-xs" />
+                <div className="mt-2 flex items-center gap-2">
+                  <button onClick={addBulk} className="rounded-md bg-taupe px-4 py-2 text-sm font-semibold text-white hover:bg-taupe-deep">명단 일괄 등록</button>
+                  <span className="text-xs text-charcoal/45">{parseRoster(bulk).length}명 인식됨</span>
+                  {bulkMsg && <span className="text-xs text-charcoal/70">{bulkMsg}</span>}
+                </div>
+              </div>
+            )}
+          </div>
+
           <table className="w-full text-sm">
             <thead><tr><th className={th}>이름</th><th className={th}>초기비번(뒤4)</th><th className={th}>비번 설정</th><th className={th}>관리</th></tr></thead>
             <tbody>

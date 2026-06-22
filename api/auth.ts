@@ -108,6 +108,21 @@ export default async function handler(req: any, res: any) {
         if (emp) { delete emp.hash; delete emp.salt; await saveEmployees(e); await addLog({ user: "대표", role: "admin", action: "비번 초기화", detail: emp.name }); }
         res.status(200).json({ ok: true }); return;
       }
+      if (b.action === "bulk" && Array.isArray(b.list)) {
+        let added = 0; const skipped: string[] = [];
+        for (const item of b.list as any[]) {
+          const nm = String(item?.name || "").trim(), ph = String(item?.phone || "").replace(/[^0-9]/g, "");
+          if (!nm || ph.length < 4) { skipped.push(`${nm || "(이름없음)"}: 전화번호 확인`); continue; }
+          if (Object.values(e).some((x: any) => x.name.trim() === nm && x.phone4 === ph.slice(-4))) { skipped.push(`${nm}: 이미 등록됨`); continue; }
+          const nid = uid();
+          e[nid] = { id: nid, name: nm, phone4: ph.slice(-4), active: true };
+          added++;
+        }
+        if (added) await saveEmployees(e);
+        await addLog({ user: "대표", role: "admin", action: "직원 일괄추가", detail: `${added}명 추가` });
+        res.status(200).json({ ok: true, added, skipped });
+        return;
+      }
       const name = String(b.name || "").trim(), phone = String(b.phone || "").replace(/[^0-9]/g, "");
       if (!name || phone.length < 4) { res.status(400).json({ error: "이름과 전화번호(4자리 이상)를 입력하세요" }); return; }
       const id = uid();
