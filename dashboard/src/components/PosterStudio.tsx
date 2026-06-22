@@ -12,6 +12,7 @@ import { searchIcons, iconToDataUrl, type IconResult } from "../lib/iconStickers
 import { STICKER_SVGS, SVG_KEYS } from "../lib/stickerAssets";
 import { DESIGNED_SVGS, DESIGNED_KEYS, DESIGNED_LABELS } from "../lib/designedStickers";
 import { Poster } from "./Poster";
+import { logAction } from "../lib/auth";
 
 const THEME_QUERY: Record<string, string> = {
   summer: "summer pastel aesthetic soft background",
@@ -190,6 +191,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         } catch { /* 배경 실패해도 색은 적용됨 */ }
       }
       setNotice(`AI 테마 "${p.label}" 적용됨${via(d)} ✓`);
+      logAction("AI 자동디자인", `${aiPrompt.trim().slice(0, 40)} → ${p.label}`);
       setAiGi(null); setAiPrompt("");
     } catch (e) { setAiNote(`오류: ${(e as Error).message}`); }
     finally { setAiLoading(false); }
@@ -419,13 +421,14 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.editUrl) throw new Error(d.error || `export ${r.status}`);
     setNotice("캔바에 디자인을 만들었어요. 새 탭에서 편집하세요 ✓");
+    logAction("캔바 전송", `${data.sheet} ${data.groups[gi]?.group || ""}`.slice(0, 60));
     window.open(d.editUrl, "_blank");
   }
   const exportCanva = (gi: number) => { setError(null); setNotice(null); setCanvaBusy(true); setCap({ gi, name: fileName(gi), action: "canva" }); };
   async function canvaLogout() { await fetch("/api/canva/logout", { method: "POST" }).catch(() => {}); refreshCanva(); }
 
   const fileName = (gi: number) => `뷰티파크_${data.sheet}_${sanitize(data.groups[gi].group)}_${sizeKey}.png`;
-  const downloadOne = (gi: number) => setCap({ gi, name: fileName(gi), action: "download" });
+  const downloadOne = (gi: number) => { logAction("PNG 다운로드", `${data.sheet} ${data.groups[gi]?.group || ""}`.slice(0, 60)); setCap({ gi, name: fileName(gi), action: "download" }); };
   async function downloadAll() {
     setBusy(true);
     for (let gi = 0; gi < data.groups.length; gi++) {

@@ -4,6 +4,7 @@ import { references, latest, nextMonth, key, label, history, type HMonth } from 
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
 import { suggestTitles, suggestPackages, type PackageGroup } from "../lib/ai";
 import { parsePriceBook, loadPriceBook, savePriceBook, cleanTxName, type PriceBook } from "../lib/pricebook";
+import { logAction } from "../lib/auth";
 
 interface PItem { name: string; normal: string; event: string }
 interface PGroup { group: string; items: PItem[] }
@@ -132,6 +133,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
     const { provider, model } = parseEngine(aiEngine);
     const res = await suggestPackages({ month: key(y, m), treatments: pool, description: pkgDesc, examples, provider, model, eventCount: pkgEventCount, itemsPerEvent: pkgItems });
     setPkgGroups(res.groups); setPkgNote(res.note); setPkgLoading(false);
+    logAction("AI 패키지추천", pkgDesc.slice(0, 60));
   }
   const toPGroup = (g: PackageGroup): PGroup => ({
     group: g.title,
@@ -175,7 +177,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
         .map((g) => ({ group: g.group.trim() || "이벤트", items: g.items.filter((it) => it.name.trim() && won(it.event) > 0).map((it) => ({ name: it.name.trim(), normal: won(it.normal) || null, event: won(it.event), eventVat: null, featured: false })) }))
         .filter((g) => g.items.length),
     };
-    if (data.groups.length) onGenerate(data);
+    if (data.groups.length) { logAction("디자인 생성으로 보내기", `${data.groups.length}개 이벤트`); onGenerate(data); }
   }
 
   const planItems = plan.reduce((n, g) => n + g.items.length, 0);
