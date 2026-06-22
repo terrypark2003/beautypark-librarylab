@@ -3,6 +3,7 @@ import type { RequestData } from "../lib/types";
 import { references, latest, nextMonth, key, label, history, type HMonth } from "../lib/history";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
 import { suggestTitles, suggestPackages, type PackageGroup } from "../lib/ai";
+import { parsePriceBook, loadPriceBook, savePriceBook, cleanTxName, type PriceBook } from "../lib/pricebook";
 
 interface PItem { name: string; normal: string; event: string }
 interface PGroup { group: string; items: PItem[] }
@@ -62,6 +63,22 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
   const [overrides, setOverrides] = useState<Record<string, HMonth>>({});
   const [ovError, setOvError] = useState<string | null>(null);
   const ovRef = useRef<HTMLInputElement>(null);
+  // 수가표(가격표) — 시술명 자동완성 + 가격 자동입력
+  const [priceBook, setPriceBook] = useState<PriceBook>(() => loadPriceBook());
+  const pbRef = useRef<HTMLInputElement>(null);
+  async function onPriceBook(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setOvError(null);
+    try {
+      const { wb } = await loadWorkbook(await file.arrayBuffer());
+      const book = parsePriceBook(wb);
+      if (!Object.keys(book).length) throw new Error("수가표에서 '사용명칭/가격' 열을 찾지 못했습니다");
+      setPriceBook(book);
+      savePriceBook(book);
+    } catch (err) { setOvError(`수가표를 읽지 못했습니다: ${(err as Error).message}`); }
+    e.target.value = "";
+  }
 
   // AI 타이틀 추천
   const [aiFor, setAiFor] = useState<number | null>(null);
@@ -99,6 +116,14 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
       for (const g of hm.groups) for (const it of g.items) if (it.name) map[it.name.trim()] = { normal: it.normal, event: it.event };
     return map;
   }, [effHistory]);
+
+  // 자동완성 후보: 수가표 + 과거 시술명
+  const nameOpts = useMemo(
+    () => Array.from(new Set([...Object.keys(priceBook), ...Object.keys(priceMap)])).filter(Boolean).sort().slice(0, 3000),
+    [priceBook, priceMap]
+  );
+  // 시술명 → 가격 자동입력값(부가세 전). 수가표 우선, 없으면 과거 데이터.
+  const lookupPrice = (name: string) => priceBook[cleanTxName(name)] || priceMap[name.trim()] || priceMap[cleanTxName(name)];
 
   async function runPkg() {
     setPkgLoading(true);
@@ -171,12 +196,15 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
           <select value={m} onChange={(e) => setM(Number(e.target.value))} className="rounded-md border border-taupe/40 bg-white px-2 py-1.5">{Array.from({ length: 12 }, (_, i) => i + 1).map((mm) => <option key={mm} value={mm}>{mm}월</option>)}</select>
           <input ref={ovRef} type="file" accept=".xlsx" className="hidden" onChange={onOverride} />
           <button onClick={() => ovRef.current?.click()} className="rounded-md border border-taupe/40 bg-white px-3 py-1.5 font-medium text-taupe-deep hover:bg-taupe/10">엑셀로 히스토리 덮어쓰기</button>
+          <input ref={pbRef} type="file" accept=".xlsx" className="hidden" onChange={onPriceBook} />
+          <button onClick={() => pbRef.current?.click()} title="시술명 자동완성·가격 자동입력에 쓸 수가표(엑셀)를 올리세요" className="rounded-md border border-taupe-deep/40 bg-white px-3 py-1.5 font-medium text-taupe-deep hover:bg-taupe/10">💲 수가표 업로드</button>
         </div>
       </div>
-      {(Object.keys(overrides).length > 0 || ovError) && (
-        <div className="-mt-3 text-xs">
+      {(Object.keys(overrides).length > 0 || Object.keys(priceBook).length > 0 || ovError) && (
+        <div className="-mt-3 flex flex-wrap gap-2 text-xs">
           {Object.keys(overrides).length > 0 && <span className="rounded bg-emerald-50 px-2 py-1 text-emerald-700">✔ 내 엑셀로 덮어씀: {Object.keys(overrides).sort().map(label).join(", ")}</span>}
-          {ovError && <span className="ml-2 text-red-600">{ovError}</span>}
+          {Object.keys(priceBook).length > 0 && <span className="rounded bg-emerald-50 px-2 py-1 text-emerald-700">💲 수가표 {Object.keys(priceBook).length}개 시술 — 시술명 입력 시 자동완성·가격 자동입력</span>}
+          {ovError && <span className="text-red-600">{ovError}</span>}
         </div>
       )}
 
@@ -250,6 +278,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
           </div>
         )}
 
+        <datalist id="tx-book">{nameOpts.map((n) => <option key={n} value={n} />)}</datalist>
         {plan.length === 0 ? (
           <p className="rounded-md bg-ivory p-4 text-center text-sm text-charcoal/50">과거 참고에서 “불러오기”로 시작하거나 “+ 이벤트”로 직접 구성하세요.</p>
         ) : (
@@ -257,7 +286,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-taupe/10 text-xs text-taupe-deep">
-                  <th className={`${cell} w-44 text-left`}>타이틀</th>
+                  <th className={`${cell} w-52 text-left`}>타이틀</th>
                   <th className={`${cell} text-left`}>시술명</th>
                   <th className={`${cell} w-24`}>정상가<div className="font-normal text-charcoal/40">부가세 전</div></th>
                   <th className={`${cell} w-24`}>이벤트가<div className="font-normal text-charcoal/40">부가세 전</div></th>
@@ -272,7 +301,9 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
                     <tr key={`${gi}-${ii}`} className="align-top">
                       {ii === 0 && (
                         <td className={`${cell} bg-ivory/50 align-top`} rowSpan={g.items.length}>
-                          <input value={g.group} onChange={(e) => up((p) => { p[gi].group = e.target.value; return p; })} className="w-full bg-transparent text-sm font-semibold outline-none" />
+                          <textarea value={g.group} onChange={(e) => up((p) => { p[gi].group = e.target.value; return p; })} rows={1}
+                            ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; } }}
+                            className="w-full resize-none break-words bg-transparent text-sm font-semibold leading-snug outline-none" />
                           <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
                             <button onClick={() => up((p) => { p[gi].items.push({ name: "", normal: "", event: "" }); return p; })} className="text-taupe hover:underline">+ 시술</button>
                             <button onClick={() => up((p) => { p.splice(gi, 1); return p; })} className="text-charcoal/40 hover:text-red-600">그룹삭제</button>
@@ -295,7 +326,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
                           )}
                         </td>
                       )}
-                      <td className={cell}><input value={it.name} placeholder="시술명 (구성·횟수)" onChange={(e) => up((p) => { p[gi].items[ii].name = e.target.value; return p; })} className="w-full bg-transparent text-sm outline-none" /></td>
+                      <td className={cell}><input value={it.name} list="tx-book" placeholder="시술명 (구성·횟수)" onChange={(e) => up((p) => { const v = e.target.value; p[gi].items[ii].name = v; const pb = lookupPrice(v); if (pb) { if (pb.normal != null) p[gi].items[ii].normal = String(pb.normal); if (pb.event != null) p[gi].items[ii].event = String(pb.event); } return p; })} className="w-full bg-transparent text-sm outline-none" /></td>
                       <td className={cell}><input value={it.normal} inputMode="numeric" placeholder="0" onChange={(e) => up((p) => { p[gi].items[ii].normal = e.target.value; return p; })} className={numInput} /></td>
                       <td className={cell}><input value={it.event} inputMode="numeric" placeholder="0" onChange={(e) => up((p) => { p[gi].items[ii].event = e.target.value; return p; })} className={`${numInput} font-semibold text-taupe-deep`} /></td>
                       <td className={`${cell} bg-taupe/5 text-right tabular-nums text-charcoal/70`}>{won(it.event) ? fmt(vatIncl(it.event)) : "—"}</td>

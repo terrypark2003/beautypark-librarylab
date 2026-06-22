@@ -145,9 +145,11 @@
 .poster.v-studio .studio-head .script { font-size: 1.7em; margin-top: .3em; }
 /* 제품명: 흰 박스 제거 + 세로 중앙 + 가운데 정렬 */
 .poster.v-studio .body > .panel { flex: none; margin: auto 0; align-self: center; width: 100%; background: transparent; box-shadow: none; padding: 0; }
-.poster.v-studio .row { flex: none; justify-content: center; border-bottom: 0; padding: .3em 1em; gap: .8em; }
-.poster.v-studio .name { max-width: 100%; text-align: center; font-weight: 500; letter-spacing: .04em; }
-.poster.v-studio .price { justify-content: center; }
+.poster.v-studio .row { flex: none; justify-content: space-between; border-bottom: 0; padding: .3em 1em; gap: .8em; }
+.poster.v-studio .name { max-width: 64%; text-align: left; font-weight: 500; letter-spacing: .02em; }
+/* 가격을 끈 브랜드용일 때만 시술명 가운데 정렬(YUJE 레퍼런스 느낌) */
+.poster.v-studio.noprice .row { justify-content: center; }
+.poster.v-studio.noprice .name { max-width: 100%; text-align: center; letter-spacing: .04em; }
 /* 하단 중앙 로고 + 위쪽 헤어라인 */
 .poster.v-studio .studio-brand { display: flex; flex-direction: column; align-items: center; gap: .25em; padding: .85em 0 .15em; border-top: 1px solid currentColor; }
 .poster.v-studio .studio-logo { height: 3em; width: auto; max-width: 72%; object-fit: contain; }
