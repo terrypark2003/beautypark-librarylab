@@ -64,12 +64,13 @@ interface Opts {
   titleScale: number; // 제목 크기 배율
   headBg: string; // 타이틀 배경 색(빈칸=테마 기본). 밴드 레이아웃/색 지정 시 박스로 표시
   headBgOpacity: number; // 타이틀 배경 투명도(0~100)
+  showSpark: boolean; // 반짝임(✦) 장식 표시(기본 꺼짐)
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, logoVariant: "auto", logoPos: "left", panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
   showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true, showVat: true, footScale: 1, vatScale: 1,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
-  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1, headBg: "", headBgOpacity: 100,
+  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1, headBg: "", headBgOpacity: 100, showSpark: false,
 };
 
 const SIZES = [
@@ -496,7 +497,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       showVat: o.showVat, footScale: o.footScale, vatScale: o.vatScale,
       nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
       brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle,
-      titleFx: o.titleFx, titleFont: o.titleFont, titleScale: o.titleScale, headBg: o.headBg, headBgOpacity: o.headBgOpacity, l1Override: titleOv[gi]?.l1, l2Override: titleOv[gi]?.l2,
+      titleFx: o.titleFx, titleFont: o.titleFont, titleScale: o.titleScale, headBg: o.headBg, headBgOpacity: o.headBgOpacity, showSpark: o.showSpark, l1Override: titleOv[gi]?.l1, l2Override: titleOv[gi]?.l2,
       panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScaleX: L(gi).panelScaleX, panelScaleY: L(gi).panelScaleY,
       logoDx: L(gi).logo.dx, logoDy: L(gi).logo.dy, headDx: L(gi).head.dx, headDy: L(gi).head.dy,
       footDx: L(gi).foot.dx, footDy: L(gi).foot.dy, vatDx: L(gi).vat.dx, vatDy: L(gi).vat.dy,
@@ -658,6 +659,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showPrice} onChange={(e) => setO(gi, { showPrice: e.target.checked })} className="accent-taupe" />가격</label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showDiscount} onChange={(e) => setO(gi, { showDiscount: e.target.checked })} className="accent-taupe" />할인율</label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={o.showHeader} onChange={(e) => setO(gi, { showHeader: e.target.checked })} className="accent-taupe" />헤더바</label>
+                    <label className="flex items-center gap-1"><input type="checkbox" checked={o.showSpark} onChange={(e) => setO(gi, { showSpark: e.target.checked })} className="accent-taupe" />반짝임</label>
                   </div>
 
                   <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">

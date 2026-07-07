@@ -65,6 +65,7 @@ interface Props {
   stickers?: Sticker[]; // 장식 스티커
   selectedStickerId?: string; // 선택된 스티커 표시(편집 미리보기 전용, 내보내기엔 미전달)
   logoPos?: "left" | "right"; // 로고 위치: 좌측 상단(기본)/우측 상단
+  showSpark?: boolean; // 반짝임(✦) 장식 표시
 }
 
 const ALIGN: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
@@ -85,7 +86,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, logoVariant = "auto", panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, bgZoom = 1, bgDx = 0, bgDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [], selectedStickerId, logoPos = "left" }, ref) => {
+  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, logoVariant = "auto", panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, bgZoom = 1, bgDx = 0, bgDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [], selectedStickerId, logoPos = "left", showSpark = false }, ref) => {
     const theme = themeDef || THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -150,9 +151,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
 
         {showTitle && (
           <>
-            <Spark cls="s1" />
-            <Spark cls="s2" />
-            <Spark cls="s3" />
+            {showSpark && <><Spark cls="s1" /><Spark cls="s2" /><Spark cls="s3" /></>}
             <div className="top" style={logoPos === "right" ? { flexDirection: "row-reverse" } : undefined}>
               {logoUrl ? (
                 <img className="logo-img" data-drag="logo" style={logoDx || logoDy ? { transform: `translate(${logoDx}px, ${logoDy}px)` } : undefined} src={logoSrc} alt="BEAUTY PARK 뷰티파크의원 범어점" />
