@@ -63,6 +63,7 @@ interface Props {
   footDx?: number; footDy?: number; footScale?: number; // 하단 안내문구 이동/크기
   vatDx?: number; vatDy?: number; vatScale?: number; // VAT 배지 이동/크기
   stickers?: Sticker[]; // 장식 스티커
+  selectedStickerId?: string; // 선택된 스티커 표시(편집 미리보기 전용, 내보내기엔 미전달)
 }
 
 const ALIGN: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
@@ -83,7 +84,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, logoVariant = "auto", panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, bgZoom = 1, bgDx = 0, bgDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [] }, ref) => {
+  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, logoVariant = "auto", panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, bgZoom = 1, bgDx = 0, bgDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [], selectedStickerId }, ref) => {
     const theme = themeDef || THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -249,7 +250,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
           const img = s.char.startsWith("img:") ? s.char.slice(4) : null;
           return (
             <div key={s.id} className={`sticker${s.badge ? " badge" : ""}${img ? " img" : ""}`} data-drag={`s:${s.id}`}
-              style={{ left: `${s.x}%`, top: `${s.y}%`, fontSize: `${s.size}em`, transform: `translate(-50%,-50%) rotate(${s.rot}deg)` }}>
+              style={{ left: `${s.x}%`, top: `${s.y}%`, fontSize: `${s.size}em`, transform: `translate(-50%,-50%) rotate(${s.rot}deg)`, boxShadow: s.id === selectedStickerId ? "0 0 0 2px rgba(255,255,255,.9), 0 0 0 4px #3b82f6" : undefined }}>
               {svg ? (
                 <span style={{ display: "block", width: "1em", height: "1em" }} dangerouslySetInnerHTML={{ __html: svg }} />
               ) : img ? (

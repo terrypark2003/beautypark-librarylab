@@ -245,7 +245,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     const el = (e.target as HTMLElement).closest("[data-drag]") as HTMLElement | null;
     // 빈 영역 클릭 → 배경 이동(배경 사진이 있을 때만)
     const tag = el ? el.getAttribute("data-drag")! : ((plates[gi] || themeBg(themeFor(gi))) ? "bg" : null);
-    if (!tag) return;
+    if (!tag) { setSelSticker(null); return; }
+    if (!tag.startsWith("s:")) setSelSticker(null); // 다른 요소·빈 영역 클릭 → 선택 해제
     const scale = previewW / size.w;
     // 더블탭 → 편집 팝업 (드래그용 preventDefault가 네이티브 dblclick을 막으므로 수동 감지)
     if (tag === "head" || tag === "foot" || tag === "vat" || tag === "logo") {
@@ -329,6 +330,19 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     setStickers((m) => ({ ...m, [gi]: (m[gi] || []).filter((s) => s.id !== id) }));
     setSelSticker(null);
   };
+  // 선택한 디자인 컴포넌트 위에서 Delete/Backspace → 삭제 (입력창 포커스 중엔 무시)
+  useEffect(() => {
+    if (!selSticker) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const a = document.activeElement as HTMLElement | null;
+      if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable)) return;
+      e.preventDefault();
+      delSticker(selSticker.gi, selSticker.id);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selSticker]);
   const resetPanel = (gi: number) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT } }));
 
   async function runStock() {
@@ -528,7 +542,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
               <div data-gi={gi} style={{ ...previewWrap(size.w, size.h), touchAction: "none", cursor: "grab" }}
                 onPointerDown={(e) => onDragStart(gi, e)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}
                 onDoubleClick={(e) => onTitleDblClick(gi, e)} title="배경 위에서 마우스 휠로 확대/축소 · 끌어서 위치 · 타이틀 더블클릭 편집">
-                <div style={previewInner}><Poster {...posterProps(gi)} /></div>
+                <div style={previewInner}><Poster {...posterProps(gi)} selectedStickerId={selSticker?.gi === gi ? selSticker.id : undefined} /></div>
               </div>
 
               <div className="flex items-center gap-1.5" style={{ width: previewW }}>
@@ -685,7 +699,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                       const label = st.char.startsWith("img:") ? "🖼 이미지" : st.char.startsWith("svg:") ? (DESIGNED_LABELS[st.char.slice(4)] || st.char.slice(4)) : st.char;
                       return (
                         <div className="mt-2 space-y-1 rounded bg-white p-2">
-                          <div className="flex items-center justify-between"><span>선택: <b>{label}</b></span><button onClick={() => delSticker(gi, st.id)} className="text-red-600 hover:underline">삭제</button></div>
+                          <div className="flex items-center justify-between"><span>선택: <b>{label}</b> <span className="text-charcoal/40">· Delete 키로 삭제</span></span><button onClick={() => delSticker(gi, st.id)} className="text-red-600 hover:underline">삭제</button></div>
                           <label className="flex items-center gap-2">크기<input type="range" min={0.6} max={16} step={0.1} value={st.size} onChange={(e) => updSticker(gi, st.id, { size: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
                           <label className="flex items-center gap-2">회전<input type="range" min={-180} max={180} step={1} value={st.rot} onChange={(e) => updSticker(gi, st.id, { rot: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
                         </div>
