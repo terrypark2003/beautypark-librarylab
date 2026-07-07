@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Workbook } from "exceljs";
-import { toPng } from "html-to-image";
+import { toPng, toJpeg } from "html-to-image";
 import type { RequestData } from "../lib/types";
 import { sampleData } from "../lib/sample";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
@@ -84,7 +84,20 @@ const SIZES = [
   { key: "popA4", label: "홈팝업 A4 (1240×1754)", w: 1240, h: 1754 },
   { key: "promoThumb", label: "기획전 썸네일 (1080×540)", w: 1080, h: 540 },
   { key: "promoGuide", label: "기획전 안내용 (960×1280)", w: 960, h: 1280 },
+  { key: "toss", label: "토스 단말기 (800×1280)", w: 800, h: 1280 },
 ] as const;
+
+// data URL(base64)의 실제 바이트 추정
+const dataUrlBytes = (url: string) => Math.floor((url.length - url.indexOf(",") - 1) * 0.75);
+// 토스 단말기용: 5MB 이내가 되도록 화질을 단계적으로 낮춰 JPEG 생성(800×1280 정확히)
+async function jpegUnderLimit(node: HTMLElement, w: number, h: number, maxBytes: number) {
+  let url = "";
+  for (const q of [0.92, 0.85, 0.78, 0.7, 0.6, 0.5]) {
+    url = await toJpeg(node, { quality: q, pixelRatio: 1, width: w, height: h, cacheBust: true, backgroundColor: "#ffffff" });
+    if (dataUrlBytes(url) <= maxBytes) break;
+  }
+  return url;
+}
 
 const LAYOUTS = [
   { key: "classic", label: "기본" }, { key: "center", label: "센터" }, { key: "band", label: "밴드" },
@@ -232,7 +245,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     const el = (e.target as HTMLElement).closest("[data-drag]") as HTMLElement | null;
     // 빈 영역 클릭 → 배경 이동(배경 사진이 있을 때만)
     const tag = el ? el.getAttribute("data-drag")! : ((plates[gi] || themeBg(themeFor(gi))) ? "bg" : null);
-    if (!tag) return;
+    if (!tag) { setSelSticker(null); return; }
+    if (!tag.startsWith("s:")) setSelSticker(null); // 다른 요소·빈 영역 클릭 → 선택 해제
     const scale = previewW / size.w;
     // 더블탭 → 편집 팝업 (드래그용 preventDefault가 네이티브 dblclick을 막으므로 수동 감지)
     if (tag === "head" || tag === "foot" || tag === "vat" || tag === "logo") {
@@ -316,6 +330,19 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     setStickers((m) => ({ ...m, [gi]: (m[gi] || []).filter((s) => s.id !== id) }));
     setSelSticker(null);
   };
+  // 선택한 디자인 컴포넌트 위에서 Delete/Backspace → 삭제 (입력창 포커스 중엔 무시)
+  useEffect(() => {
+    if (!selSticker) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const a = document.activeElement as HTMLElement | null;
+      if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable)) return;
+      e.preventDefault();
+      delSticker(selSticker.gi, selSticker.id);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selSticker]);
   const resetPanel = (gi: number) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT } }));
 
   async function runStock() {
@@ -386,10 +413,14 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         await new Promise((r) => setTimeout(r, 150));
         const node = captureRef.current;
         if (node && !cancelled) {
-          // 캔바 전송은 원본 사이즈(서버리스 본문 한도), 홈팝업·기획전은 권장 해상도 그대로(정확히), 그 외는 2배(대형은 1.5배)
-          const exact = toCanva || sizeKey.startsWith("pop") || sizeKey.startsWith("promo");
+          // 캔바 전송은 원본 사이즈(서버리스 본문 한도), 홈팝업·기획전·토스는 권장 해상도 그대로(정확히), 그 외는 2배(대형은 1.5배)
+          const isToss = sizeKey === "toss";
+          const exact = toCanva || isToss || sizeKey.startsWith("pop") || sizeKey.startsWith("promo");
           const pr = exact ? 1 : size.w >= 1600 ? 1.5 : 2;
-          const url = await toPng(node, { pixelRatio: pr, width: size.w, height: size.h, cacheBust: true });
+          // 토스 단말기 다운로드는 JPEG로 5MB 이내 보장(캔바 전송은 기존 PNG 유지)
+          const url = isToss && !toCanva
+            ? await jpegUnderLimit(node, size.w, size.h, 5 * 1024 * 1024)
+            : await toPng(node, { pixelRatio: pr, width: size.w, height: size.h, cacheBust: true });
           if (toCanva) await sendToCanva(cap.gi, url);
           else { const a = document.createElement("a"); a.href = url; a.download = cap.name; a.click(); }
         }
@@ -427,7 +458,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const exportCanva = (gi: number) => { setError(null); setNotice(null); setCanvaBusy(true); setCap({ gi, name: fileName(gi), action: "canva" }); };
   async function canvaLogout() { await fetch("/api/canva/logout", { method: "POST" }).catch(() => {}); refreshCanva(); }
 
-  const fileName = (gi: number) => `뷰티파크_${data.sheet}_${sanitize(data.groups[gi].group)}_${sizeKey}.png`;
+  const fileName = (gi: number) => `뷰티파크_${data.sheet}_${sanitize(data.groups[gi].group)}_${sizeKey}.${sizeKey === "toss" ? "jpg" : "png"}`;
   const downloadOne = (gi: number) => { logAction("PNG 다운로드", `${data.sheet} ${data.groups[gi]?.group || ""}`.slice(0, 60)); setCap({ gi, name: fileName(gi), action: "download" }); };
   async function downloadAll() {
     setBusy(true);
@@ -478,6 +509,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
             <select value={sizeKey} onChange={(e) => setSizeKey(e.target.value)} className="rounded-md border border-taupe/40 bg-white px-2 py-1.5 text-sm font-medium">
               {SIZES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
+            {sizeKey === "toss" && <span className="rounded-md bg-taupe/10 px-2 py-1 text-[11px] text-taupe-deep">JPEG · 5MB 이내 자동</span>}
             {monthSheets.length > 1 && (
               <select onChange={onSheet} defaultValue={data.sheet} className="rounded-md border border-taupe/40 bg-white px-2 py-1.5 text-sm">
                 {monthSheets.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -485,7 +517,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
             )}
             <input ref={fileRef} type="file" accept=".xlsx" onChange={onFile} className="hidden" />
             <button onClick={() => fileRef.current?.click()} className="rounded-md bg-taupe px-4 py-2 text-sm font-semibold text-white transition hover:bg-taupe-deep">엑셀 업로드</button>
-            <button onClick={downloadAll} disabled={busy} className="rounded-md border border-taupe/40 bg-white px-4 py-2 text-sm font-semibold text-taupe-deep transition hover:bg-taupe/10 disabled:opacity-50">{busy ? "생성 중…" : "전체 PNG"}</button>
+            <button onClick={downloadAll} disabled={busy} className="rounded-md border border-taupe/40 bg-white px-4 py-2 text-sm font-semibold text-taupe-deep transition hover:bg-taupe/10 disabled:opacity-50">{busy ? "생성 중…" : sizeKey === "toss" ? "전체 JPG" : "전체 PNG"}</button>
             {canva?.configured && (canva.connected ? (
               <span className="flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-2 text-xs font-medium text-emerald-700">
                 캔바 {canva.name ? `· ${canva.name}` : "연결됨"} ✓
@@ -510,7 +542,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
               <div data-gi={gi} style={{ ...previewWrap(size.w, size.h), touchAction: "none", cursor: "grab" }}
                 onPointerDown={(e) => onDragStart(gi, e)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}
                 onDoubleClick={(e) => onTitleDblClick(gi, e)} title="배경 위에서 마우스 휠로 확대/축소 · 끌어서 위치 · 타이틀 더블클릭 편집">
-                <div style={previewInner}><Poster {...posterProps(gi)} /></div>
+                <div style={previewInner}><Poster {...posterProps(gi)} selectedStickerId={selSticker?.gi === gi ? selSticker.id : undefined} /></div>
               </div>
 
               <div className="flex items-center gap-1.5" style={{ width: previewW }}>
@@ -534,7 +566,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                 <select value={variantFor(gi)} onChange={(e) => setVariants((m) => ({ ...m, [gi]: e.target.value }))} className="min-w-0 flex-1 rounded-md border border-taupe/40 bg-white px-1.5 py-1.5 text-xs">
                   {LAYOUTS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}
                 </select>
-                <button onClick={() => downloadOne(gi)} className="shrink-0 rounded-md bg-taupe px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-taupe-deep">PNG</button>
+                <button onClick={() => downloadOne(gi)} className="shrink-0 rounded-md bg-taupe px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-taupe-deep">{sizeKey === "toss" ? "JPG" : "PNG"}</button>
               </div>
 
               <div className="flex items-center gap-2" style={{ width: previewW }}>
@@ -667,7 +699,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                       const label = st.char.startsWith("img:") ? "🖼 이미지" : st.char.startsWith("svg:") ? (DESIGNED_LABELS[st.char.slice(4)] || st.char.slice(4)) : st.char;
                       return (
                         <div className="mt-2 space-y-1 rounded bg-white p-2">
-                          <div className="flex items-center justify-between"><span>선택: <b>{label}</b></span><button onClick={() => delSticker(gi, st.id)} className="text-red-600 hover:underline">삭제</button></div>
+                          <div className="flex items-center justify-between"><span>선택: <b>{label}</b> <span className="text-charcoal/40">· Delete 키로 삭제</span></span><button onClick={() => delSticker(gi, st.id)} className="text-red-600 hover:underline">삭제</button></div>
                           <label className="flex items-center gap-2">크기<input type="range" min={0.6} max={16} step={0.1} value={st.size} onChange={(e) => updSticker(gi, st.id, { size: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
                           <label className="flex items-center gap-2">회전<input type="range" min={-180} max={180} step={1} value={st.rot} onChange={(e) => updSticker(gi, st.id, { rot: Number(e.target.value) })} className="flex-1 accent-taupe" /></label>
                         </div>
