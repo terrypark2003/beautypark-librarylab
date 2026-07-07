@@ -38,6 +38,7 @@ const DEFAULT_LAYOUT: Layout = { panel: { dx: 0, dy: 0 }, logo: { dx: 0, dy: 0 }
 interface Opts {
   logoScale: number;
   logoVariant: "auto" | "color" | "white"; // 로고 색: 자동/유색/무색(화이트)
+  logoPos: "left" | "right"; // 로고 위치: 좌측 상단/우측 상단
   panelTop: number;
   panelBottom: number;
   panelWidth: number;
@@ -65,7 +66,7 @@ interface Opts {
   headBgOpacity: number; // 타이틀 배경 투명도(0~100)
 }
 const DEFAULT_OPTS: Opts = {
-  logoScale: 1, logoVariant: "auto", panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
+  logoScale: 1, logoVariant: "auto", logoPos: "left", panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
   showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true, showVat: true, footScale: 1, vatScale: 1,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
   brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1, headBg: "", headBgOpacity: 100,
@@ -343,6 +344,13 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selSticker]);
+  // 편집 팝업: Escape로 닫기 (배경 클릭 닫힘을 없앤 대신)
+  useEffect(() => {
+    if (titleEdit === null && !fxEdit) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setTitleEdit(null); setFxEdit(null); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [titleEdit, fxEdit]);
   const resetPanel = (gi: number) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT } }));
 
   async function runStock() {
@@ -482,7 +490,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
     return {
       group: data.groups[gi], themeKey: themeFor(gi), themeDef: resolveTheme(gi), sheet: data.sheet, width: size.w, height: size.h,
       bgUrl: plate?.url, photoBg: !plate ? themeBg(themeFor(gi)) : undefined, hideTitle: plate?.hideTitle,
-      logoScale: o.logoScale, logoVariant: o.logoVariant, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
+      logoScale: o.logoScale, logoVariant: o.logoVariant, logoPos: o.logoPos, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount, showPrice: o.showPrice,
       showVat: o.showVat, footScale: o.footScale, vatScale: o.vatScale,
@@ -631,13 +639,18 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   </div>
 
                   <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
-                    <div className="font-medium text-charcoal/60">코너 표기 (우상단)</div>
-                    <input value={o.brandTop} onChange={(e) => setO(gi, { brandTop: e.target.value })} placeholder={`윗줄 (빈칸 = EVENT · ${data.sheet})`} className="w-full rounded border border-taupe/30 px-2 py-1" />
-                    <input value={o.brandSub} onChange={(e) => setO(gi, { brandSub: e.target.value })} placeholder="아랫줄 (예: BEOMEO · 빈칸 = 숨김)" className="w-full rounded border border-taupe/30 px-2 py-1" />
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-1">폰트<select value={o.brandFont} onChange={(e) => setO(gi, { brandFont: e.target.value as Opts["brandFont"] })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="sans">산세리프</option><option value="serif">세리프</option></select></label>
-                      <label className="flex items-center gap-1">형식<select value={o.brandStyle} onChange={(e) => setO(gi, { brandStyle: e.target.value as Opts["brandStyle"] })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="stack">2줄</option><option value="line">한 줄</option><option value="hidden">숨김</option></select></label>
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-charcoal/60">코너 표기 (우상단)</span>
+                      <label className="flex items-center gap-1.5 text-charcoal/70"><input type="checkbox" checked={o.brandStyle !== "hidden"} onChange={(e) => setO(gi, { brandStyle: e.target.checked ? "stack" : "hidden" })} className="accent-taupe" />표시</label>
                     </div>
+                    {o.brandStyle !== "hidden" && (<>
+                      <input value={o.brandTop} onChange={(e) => setO(gi, { brandTop: e.target.value })} placeholder={`윗줄 (빈칸 = EVENT · ${data.sheet})`} className="w-full rounded border border-taupe/30 px-2 py-1" />
+                      <input value={o.brandSub} onChange={(e) => setO(gi, { brandSub: e.target.value })} placeholder="아랫줄 (예: BEOMEO · 빈칸 = 숨김)" className="w-full rounded border border-taupe/30 px-2 py-1" />
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1">폰트<select value={o.brandFont} onChange={(e) => setO(gi, { brandFont: e.target.value as Opts["brandFont"] })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="sans">산세리프</option><option value="serif">세리프</option></select></label>
+                        <label className="flex items-center gap-1">형식<select value={o.brandStyle} onChange={(e) => setO(gi, { brandStyle: e.target.value as Opts["brandStyle"] })} className="rounded border border-taupe/40 bg-white px-1 py-0.5"><option value="stack">2줄</option><option value="line">한 줄</option></select></label>
+                      </div>
+                    </>)}
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -770,7 +783,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         const cur = el === "logo" ? o.logoScale : el === "foot" ? o.footScale : o.vatScale;
         const setScale = (v: number) => setO(gi, el === "logo" ? { logoScale: v } : el === "foot" ? { footScale: v } : { vatScale: v });
         return (
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setFxEdit(null)}>
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4">
             <div className="mt-20 w-full max-w-xs rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-serif text-base text-taupe-deep">{title} 편집</h3>
@@ -781,11 +794,18 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                   <label className="flex items-center gap-2"><input type="checkbox" checked={o.showVat} onChange={(e) => setO(gi, { showVat: e.target.checked })} className="accent-taupe" />VAT 별도 표시</label>
                 )}
                 {el === "logo" && (
-                  <label className="flex items-center gap-2">색상
-                    <select value={o.logoVariant} onChange={(e) => setO(gi, { logoVariant: e.target.value as Opts["logoVariant"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
-                      <option value="auto">자동 (사진 위 흰색)</option><option value="color">유색 (컬러)</option><option value="white">무색 (화이트)</option>
-                    </select>
-                  </label>
+                  <>
+                    <label className="flex items-center gap-2">색상
+                      <select value={o.logoVariant} onChange={(e) => setO(gi, { logoVariant: e.target.value as Opts["logoVariant"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
+                        <option value="auto">자동 (사진 위 흰색)</option><option value="color">유색 (컬러)</option><option value="white">무색 (화이트)</option>
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2">위치
+                      <select value={o.logoPos} onChange={(e) => setO(gi, { logoPos: e.target.value as Opts["logoPos"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
+                        <option value="left">좌측 상단</option><option value="right">우측 상단</option>
+                      </select>
+                    </label>
+                  </>
                 )}
                 <label className="flex items-center gap-2">크기
                   <input type="range" min={0.6} max={el === "logo" ? 3 : 1.8} step={0.05} value={cur} onChange={(e) => setScale(Number(e.target.value))} className="flex-1 accent-taupe" disabled={el === "vat" && !o.showVat} />
@@ -837,7 +857,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
         const l1 = ov.l1 !== undefined ? ov.l1 : def.l1;
         const l2 = ov.l2 !== undefined ? ov.l2 : (def.l2 || "");
         return (
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={() => setTitleEdit(null)}>
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4">
             <div className="mt-16 w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-serif text-lg text-taupe-deep">타이틀 편집</h3>
