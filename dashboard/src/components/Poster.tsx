@@ -66,6 +66,8 @@ interface Props {
   selectedStickerId?: string; // 선택된 스티커 표시(편집 미리보기 전용, 내보내기엔 미전달)
   logoPos?: "left" | "right"; // 로고 위치: 좌측 상단(기본)/우측 상단
   showSpark?: boolean; // 반짝임(✦) 장식 표시
+  itemScales?: Record<number, number>; // 패널 아이템(행) 개별 크기 배율(인덱스→배율, 기본 1)
+  vatPos?: "left" | "right"; // 'VAT 별도' 배지 위치: 우하단(기본)/좌하단
 }
 
 const ALIGN: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
@@ -86,7 +88,7 @@ function nameScale(name: string): number {
 }
 
 export const Poster = forwardRef<HTMLDivElement, Props>(
-  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, logoVariant = "auto", panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, bgZoom = 1, bgDx = 0, bgDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [], selectedStickerId, logoPos = "left", showSpark = false }, ref) => {
+  ({ group, themeKey, themeDef, sheet, bgUrl, photoBg, hideTitle = false, width = 1080, height = 1527, logoScale = 1, logoVariant = "auto", panelTop = 0, panelBottom = 0, panelWidth = 100, panelAlign = "center", scriptOverride, variant = "classic", showHeader = false, headerPeriod = "", headerTarget = "", showDiscount = false, showPrice = true, nameSize = 1, nameWeight = 600, priceSize = 1, priceFont = "serif", brandTop, brandSub, brandFont = "sans", brandStyle = "stack", titleFx = "none", l1Override, l2Override, titleFont = "sans", titleScale = 1, headBg = "", headBgOpacity = 100, panelDx = 0, panelDy = 0, panelScaleX = 1, panelScaleY = 1, logoDx = 0, logoDy = 0, headDx = 0, headDy = 0, bgZoom = 1, bgDx = 0, bgDy = 0, showVat = true, footDx = 0, footDy = 0, footScale = 1, vatDx = 0, vatDy = 0, vatScale = 1, stickers = [], selectedStickerId, logoPos = "left", showSpark = false, itemScales, vatPos = "right" }, ref) => {
     const theme = themeDef || THEMES[themeKey] || THEMES.summer;
     const pf = PRICE_FONTS[priceFont] || PRICE_FONTS.serif;
     const t = theme.tokens;
@@ -208,9 +210,10 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
             {items.map((it, i) => {
               const n = normalPrice(it), e = eventPrice(it);
               const disc = n && e ? Math.round((1 - e / n) * 100) : 0;
+              const rs = itemScales?.[i] ?? 1; // 이 행의 개별 크기 배율
               return (
-                <div className="row" key={i}>
-                  <div className="name" style={{ fontSize: `${nameScale(it.name) * nameSize}em` }}>{it.name}</div>
+                <div className="row" key={i} style={rs !== 1 ? { ["--price-size" as any]: priceSize * rs } : undefined}>
+                  <div className="name" style={{ fontSize: `${nameScale(it.name) * nameSize * rs}em` }}>{it.name}</div>
                   {showPrice && (
                     <div className="price">
                       {showDiscount && disc > 0 && <span className="disc">{disc}%</span>}
@@ -230,7 +233,7 @@ export const Poster = forwardRef<HTMLDivElement, Props>(
         </div>
 
         <div className="foot" data-drag="foot" style={footDx || footDy ? { transform: `translate(${footDx}px, ${footDy}px)` } : undefined}>부가세 10% 별도 &nbsp;·&nbsp; 현금 / 카드 동일</div>
-        {showVat && <div className="vat" data-drag="vat" style={vatDx || vatDy ? { transform: `translate(${vatDx}px, ${vatDy}px)` } : undefined}>VAT 별도</div>}
+        {showVat && <div className="vat" data-drag="vat" style={{ ...(vatPos === "left" ? { left: "1.9em", right: "auto" } : null), ...(vatDx || vatDy ? { transform: `translate(${vatDx}px, ${vatDy}px)` } : null) }}>VAT 별도</div>}
 
         {showTitle && isStudio && (
           <div className="studio-brand">

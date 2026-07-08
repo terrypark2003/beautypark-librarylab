@@ -6,7 +6,7 @@ import { sampleData } from "../lib/sample";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
 import { THEMES, THEME_LIST, themeKeyForGroup, makeTheme, type ThemeDef } from "../lib/themes";
 import { themeBg } from "../lib/backgrounds";
-import type { Sticker } from "../lib/poster";
+import { validItems, type Sticker } from "../lib/poster";
 import { searchStock, stockToDataUrl, type StockPhoto } from "../lib/stock";
 import { searchIcons, iconToDataUrl, type IconResult } from "../lib/iconStickers";
 import { STICKER_SVGS, SVG_KEYS } from "../lib/stickerAssets";
@@ -65,12 +65,13 @@ interface Opts {
   headBg: string; // 타이틀 배경 색(빈칸=테마 기본). 밴드 레이아웃/색 지정 시 박스로 표시
   headBgOpacity: number; // 타이틀 배경 투명도(0~100)
   showSpark: boolean; // 반짝임(✦) 장식 표시(기본 꺼짐)
+  vatPos: "left" | "right"; // 'VAT 별도' 배지 위치
 }
 const DEFAULT_OPTS: Opts = {
   logoScale: 1, logoVariant: "auto", logoPos: "left", panelTop: 0, panelBottom: 0, panelWidth: 100, panelAlign: "center",
   showHeader: false, headerPeriod: "", headerTarget: "카카오톡 플러스 친구 대상", showDiscount: false, showPrice: true, showVat: true, footScale: 1, vatScale: 1,
   nameSize: 1, nameWeight: 600, priceSize: 1, priceFont: "serif",
-  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1, headBg: "", headBgOpacity: 100, showSpark: false,
+  brandTop: "", brandSub: "BEOMEO", brandFont: "sans", brandStyle: "stack", titleFx: "none", titleFont: "sans", titleScale: 1, headBg: "", headBgOpacity: 100, showSpark: false, vatPos: "right",
 };
 
 const SIZES = [
@@ -133,6 +134,7 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const [layouts, setLayouts] = useState<Record<number, Layout>>({});
   const [stickers, setStickers] = useState<Record<number, Sticker[]>>({});
   const [selSticker, setSelSticker] = useState<{ gi: number; id: string } | null>(null);
+  const [itemScales, setItemScales] = useState<Record<number, Record<number, number>>>({}); // gi→아이템인덱스→크기배율
   const [titleOv, setTitleOv] = useState<Record<number, { l1?: string; l2?: string }>>({});
   const [titleEdit, setTitleEdit] = useState<number | null>(null); // 타이틀 편집 팝업 대상 gi
   const [fxEdit, setFxEdit] = useState<{ gi: number; el: "foot" | "vat" | "logo" } | null>(null); // 로고/하단문구/VAT 편집 팝업
@@ -214,8 +216,10 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
   const via = (d: any) => (d?.via ? ` (${d.via === "anthropic" ? "Claude" : "Gemini"})` : "");
   const O = (gi: number): Opts => ({ ...DEFAULT_OPTS, ...(opts[gi] || {}) });
   const setO = (gi: number, patch: Partial<Opts>) => setOpts((m) => ({ ...m, [gi]: { ...DEFAULT_OPTS, ...(m[gi] || {}), ...patch } }));
+  const itemScaleOf = (gi: number, i: number) => itemScales[gi]?.[i] ?? 1;
+  const setItemScale = (gi: number, i: number, v: number) => setItemScales((m) => ({ ...m, [gi]: { ...(m[gi] || {}), [i]: v } }));
 
-  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setLayouts({}); setStickers({}); setSelSticker(null); setTitleOv({}); setTitleEdit(null); setFxEdit(null); setAiThemes({}); setAiGi(null); }, [data]);
+  useMemo(() => { setThemes({}); setPlates({}); setVariants({}); setScripts({}); setOpts({}); setLayouts({}); setStickers({}); setSelSticker(null); setItemScales({}); setTitleOv({}); setTitleEdit(null); setFxEdit(null); setAiThemes({}); setAiGi(null); }, [data]);
   const L = (gi: number): Layout => ({ ...DEFAULT_LAYOUT, ...(layouts[gi] || {}) });
   const setL = (gi: number, patch: Partial<Layout>) => setLayouts((m) => ({ ...m, [gi]: { ...DEFAULT_LAYOUT, ...(m[gi] || {}), ...patch } }));
   const lastTapRef = useRef<{ gi: number; tag: string; t: number } | null>(null); // 더블탭 감지용
@@ -494,8 +498,8 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
       logoScale: o.logoScale, logoVariant: o.logoVariant, logoPos: o.logoPos, panelTop: o.panelTop, panelBottom: o.panelBottom, panelWidth: o.panelWidth, panelAlign: o.panelAlign,
       scriptOverride: scriptFor(gi), variant: variantFor(gi),
       showHeader: o.showHeader, headerPeriod: o.headerPeriod, headerTarget: o.headerTarget, showDiscount: o.showDiscount, showPrice: o.showPrice,
-      showVat: o.showVat, footScale: o.footScale, vatScale: o.vatScale,
-      nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont,
+      showVat: o.showVat, footScale: o.footScale, vatScale: o.vatScale, vatPos: o.vatPos,
+      nameSize: o.nameSize, nameWeight: o.nameWeight, priceSize: o.priceSize, priceFont: o.priceFont, itemScales: itemScales[gi],
       brandTop: o.brandTop, brandSub: o.brandSub, brandFont: o.brandFont, brandStyle: o.brandStyle,
       titleFx: o.titleFx, titleFont: o.titleFont, titleScale: o.titleScale, headBg: o.headBg, headBgOpacity: o.headBgOpacity, showSpark: o.showSpark, l1Override: titleOv[gi]?.l1, l2Override: titleOv[gi]?.l2,
       panelDx: L(gi).panel.dx, panelDy: L(gi).panel.dy, panelScaleX: L(gi).panelScaleX, panelScaleY: L(gi).panelScaleY,
@@ -630,6 +634,20 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
                         <option value="serif">세리프(Playfair)</option><option value="cormorant">코모란트</option><option value="sans">산세리프</option>
                       </select>
                     </label>
+                    <div className="mt-1 space-y-1 border-t border-taupe/15 pt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-charcoal/60">줄별 크기 (아이템 개별)</span>
+                        {itemScales[gi] && <button onClick={() => setItemScales((m) => { const n = { ...m }; delete n[gi]; return n; })} className="text-[11px] text-charcoal/50 hover:underline">모두 초기화</button>}
+                      </div>
+                      {validItems(data.groups[gi]).map((it, i) => (
+                        <label key={i} className="flex items-center gap-2">
+                          <span className="w-24 shrink-0 truncate text-[11px] text-charcoal/55" title={it.name}>{it.name}</span>
+                          <input type="range" min={0.6} max={2.5} step={0.05} value={itemScaleOf(gi, i)} onChange={(e) => setItemScale(gi, i, Number(e.target.value))} className="flex-1 accent-taupe" />
+                          <span className="w-9 text-right tabular-nums text-[11px]">{Math.round(itemScaleOf(gi, i) * 100)}%</span>
+                        </label>
+                      ))}
+                      <p className="text-[10px] text-charcoal/40">전체 '상품명 크기'에 곱해집니다. 줄마다 따로 키우거나 줄일 수 있어요.</p>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 rounded border border-taupe/15 bg-white/60 p-2">
@@ -793,7 +811,14 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
               </div>
               <div className="space-y-3 text-sm">
                 {el === "vat" && (
-                  <label className="flex items-center gap-2"><input type="checkbox" checked={o.showVat} onChange={(e) => setO(gi, { showVat: e.target.checked })} className="accent-taupe" />VAT 별도 표시</label>
+                  <>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={o.showVat} onChange={(e) => setO(gi, { showVat: e.target.checked })} className="accent-taupe" />VAT 별도 표시</label>
+                    <label className="flex items-center gap-2">위치
+                      <select value={o.vatPos} onChange={(e) => setO(gi, { vatPos: e.target.value as Opts["vatPos"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5" disabled={!o.showVat}>
+                        <option value="right">우측 하단</option><option value="left">좌측 하단</option>
+                      </select>
+                    </label>
+                  </>
                 )}
                 {el === "logo" && (
                   <>
