@@ -618,13 +618,13 @@ export default function PosterStudio({ initialData }: { initialData?: RequestDat
 
                   <div className="space-y-1.5 rounded border border-taupe/15 bg-white/60 p-2">
                     <div className="font-medium text-charcoal/60">패널 글자 (하얀 박스 안)</div>
-                    <label className="flex items-center gap-2">상품명 크기<input type="range" min={0.7} max={1.5} step={0.05} value={o.nameSize} onChange={(e) => setO(gi, { nameSize: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.nameSize * 100)}%</span></label>
+                    <label className="flex items-center gap-2">상품명 크기<input type="range" min={0.7} max={2.5} step={0.05} value={o.nameSize} onChange={(e) => setO(gi, { nameSize: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.nameSize * 100)}%</span></label>
                     <label className="flex items-center gap-2">상품명 굵기
                       <select value={o.nameWeight} onChange={(e) => setO(gi, { nameWeight: Number(e.target.value) })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
                         <option value={400}>가늘게</option><option value={600}>기본</option><option value={700}>굵게</option><option value={800}>더 굵게</option>
                       </select>
                     </label>
-                    <label className="flex items-center gap-2">금액 크기<input type="range" min={0.7} max={1.6} step={0.05} value={o.priceSize} onChange={(e) => setO(gi, { priceSize: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.priceSize * 100)}%</span></label>
+                    <label className="flex items-center gap-2">금액 크기<input type="range" min={0.7} max={2.5} step={0.05} value={o.priceSize} onChange={(e) => setO(gi, { priceSize: Number(e.target.value) })} className="flex-1 accent-taupe" /><span className="w-9 text-right tabular-nums">{Math.round(o.priceSize * 100)}%</span></label>
                     <label className="flex items-center gap-2">금액 폰트
                       <select value={o.priceFont} onChange={(e) => setO(gi, { priceFont: e.target.value as Opts["priceFont"] })} className="ml-auto rounded border border-taupe/40 bg-white px-1 py-0.5">
                         <option value="serif">세리프(Playfair)</option><option value="cormorant">코모란트</option><option value="sans">산세리프</option>
