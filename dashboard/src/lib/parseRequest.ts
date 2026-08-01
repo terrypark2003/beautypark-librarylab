@@ -6,7 +6,10 @@ function num(v: unknown): number | null {
   if (typeof v === "object" && v !== null && "result" in (v as any)) {
     v = (v as any).result;
   }
-  const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.]/g, ""));
+  if (typeof v === "number") return isNaN(v) ? null : Math.round(v);
+  const s = String(v).replace(/[^0-9.]/g, "");
+  if (!s) return null; // '?', '-', '미정' 등 숫자 없는 표기는 가격 미정으로
+  const n = Number(s);
   return isNaN(n) ? null : Math.round(n);
 }
 
@@ -49,14 +52,22 @@ export function parseSheet(wb: ExcelJS.Workbook, sheetName: string): RequestData
   let current: EventGroup | null = null;
   let emphasis: string | null = null;
 
+  // 세로 병합 셀 대응: ExcelJS는 병합 범위의 모든 셀이 대표(master) 값을 돌려주므로,
+  // 대표 셀이 아닌 행을 새 그룹/새 항목으로 오인하지 않도록 이어짐 여부를 확인한다.
+  const isMergedCont = (cell: ExcelJS.Cell) => cell.isMerged && (cell as any).master?.address !== cell.address;
+
   for (let r = 5; r <= ws.rowCount; r++) {
-    const a = text(c(`A${r}`));
-    const b = text(c(`B${r}`));
-    if (a && (a.includes("월초") || a.includes("월 초 강조") || a.includes("월 중순"))) {
-      emphasis = a;
+    const cellA = c(`A${r}`);
+    const a = text(cellA);
+    const aCont = isMergedCont(cellA); // 위 타이틀 셀의 병합 이어짐 행
+    const cellB = c(`B${r}`);
+    const b = isMergedCont(cellB) ? "" : text(cellB); // 병합 이어짐(예: 안내 블록)은 항목 아님
+    if (a && (a.includes("월초") || a.includes("월 초 강조") || a.includes("월 중순") || a.includes("강조 :") || a.includes("강조:"))) {
+      if (!aCont) emphasis = a;
       continue;
     }
-    if (a) {
+    // 같은 타이틀이 반복 입력된 경우(병합 대신 채우기)도 새 그룹으로 쪼개지 않음
+    if (a && !aCont && a !== groups[groups.length - 1]?.group) {
       current = { group: a, items: [] };
       groups.push(current);
     }
