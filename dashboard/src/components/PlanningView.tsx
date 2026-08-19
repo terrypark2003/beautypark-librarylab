@@ -1,10 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RequestData } from "../lib/types";
 import { references, latest, nextMonth, key, label, history, type HMonth } from "../lib/history";
 import { loadWorkbook, parseSheet } from "../lib/parseRequest";
 import { suggestTitles, suggestPackages, type PackageGroup } from "../lib/ai";
 import { parsePriceBook, loadPriceBook, savePriceBook, cleanTxName, type PriceBook } from "../lib/pricebook";
-import { logAction } from "../lib/auth";
+import { logAction, fetchFeedback, saveFeedbackEntry, fbKey, type FeedbackMap } from "../lib/auth";
 
 interface PItem { name: string; normal: string; event: string }
 interface PGroup { group: string; items: PItem[] }
@@ -111,6 +111,38 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
   const effHistory = useMemo(() => ({ ...history, ...overrides }), [overrides]);
   const refs = useMemo(() => references(y, m, effHistory), [y, m, effHistory]);
 
+  // 이벤트 반응(상/중/하 + 메모) — 과거 이벤트가 실제로 어땠는지 기록해 다음 기획에 반영
+  const [feedback, setFeedback] = useState<FeedbackMap>({});
+  const [fbEdit, setFbEdit] = useState<{ month: string; group: string } | null>(null); // 메모 편집 대상
+  const [fbNote, setFbNote] = useState("");
+  const [fbErr, setFbErr] = useState<string | null>(null);
+  useEffect(() => { fetchFeedback().then(setFeedback); }, []);
+  const fbOf = (month: string, group: string) => feedback[month]?.[fbKey(group)];
+  async function setRating(month: string, group: string, rating: string) {
+    const k = fbKey(group);
+    const cur = fbOf(month, group);
+    const next = cur?.rating === rating ? "" : rating; // 같은 등급 다시 누르면 해제
+    const note = cur?.note || "";
+    setFeedback((f) => {
+      const n = structuredClone(f);
+      if (!next && !note) { if (n[month]) { delete n[month][k]; if (!Object.keys(n[month]).length) delete n[month]; } }
+      else (n[month] ||= {})[k] = { ...(cur || {}), rating: next as any, note };
+      return n;
+    });
+    const r = await saveFeedbackEntry(month, k, next, note);
+    setFbErr(r.ok ? null : r.error || "저장 실패");
+  }
+  async function saveNote(month: string, group: string) {
+    const k = fbKey(group);
+    const cur = fbOf(month, group);
+    const rating = cur?.rating || "";
+    setFeedback((f) => { const n = structuredClone(f); (n[month] ||= {})[k] = { ...(cur || {}), rating: rating as any, note: fbNote }; return n; });
+    const r = await saveFeedbackEntry(month, k, rating, fbNote);
+    setFbErr(r.ok ? null : r.error || "저장 실패");
+    setFbEdit(null);
+  }
+  const FB_COLORS: Record<string, string> = { 상: "bg-emerald-100 text-emerald-700 border-emerald-300", 중: "bg-amber-100 text-amber-700 border-amber-300", 하: "bg-red-100 text-red-600 border-red-300" };
+
   const priceMap = useMemo(() => {
     const map: Record<string, { normal: number | null; event: number | null }> = {};
     for (const hm of Object.values(effHistory))
@@ -131,7 +163,10 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
     const pool = Array.from(new Set(Object.values(effHistory).flatMap((hm) => hm.groups.flatMap((g) => g.items.map((i) => i.name.trim()))))).filter(Boolean);
     const examples = Array.from(new Set(Object.values(effHistory).flatMap((hm) => hm.groups.map((g) => g.group.trim())))).filter(Boolean).slice(0, 40);
     const { provider, model } = parseEngine(aiEngine);
-    const res = await suggestPackages({ month: key(y, m), treatments: pool, description: pkgDesc, examples, provider, model, eventCount: pkgEventCount, itemsPerEvent: pkgItems });
+    // 기록된 이벤트 반응을 추천 프롬프트에 반영(상=비슷한 결 유지, 하=피하기)
+    const fbLines = Object.entries(feedback).flatMap(([mo, gs]) => Object.entries(gs).filter(([, v]) => v.rating).map(([g, v]) => `[반응 ${v.rating}] ${mo} ${g}${v.note ? ` (${v.note})` : ""}`)).slice(0, 30);
+    const desc = [pkgDesc, fbLines.length ? `과거 이벤트 반응 기록(상=반응 좋았음/하=나빴음 — 참고해 구성):\n${fbLines.join("\n")}` : ""].filter(Boolean).join("\n\n");
+    const res = await suggestPackages({ month: key(y, m), treatments: pool, description: desc, examples, provider, model, eventCount: pkgEventCount, itemsPerEvent: pkgItems });
     setPkgGroups(res.groups); setPkgNote(res.note); setPkgLoading(false);
     logAction("AI 패키지추천", pkgDesc.slice(0, 60));
   }
@@ -212,7 +247,11 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
 
       {/* 과거 참고 */}
       <div>
-        <h3 className="mb-3 font-serif text-lg text-taupe-deep">📚 과거 참고 ({m}월 라인업)</h3>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <h3 className="font-serif text-lg text-taupe-deep">📚 과거 참고 ({m}월 라인업)</h3>
+          <span className="text-[11px] text-charcoal/45">각 이벤트 옆 상/중/하로 반응을 기록해두면 다음 기획 때 참고돼요</span>
+          {fbErr && <span className="text-[11px] text-red-600">⚠ {fbErr}</span>}
+        </div>
         <div className="grid gap-3 lg:grid-cols-3">
           {refs.map((r) => (
             <div key={r.key} className="rounded-lg border border-taupe/15 bg-white p-3">
@@ -222,12 +261,34 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
               </div>
               {r.data && (
                 <div className="max-h-60 space-y-2 overflow-auto pr-1">
-                  {r.data.groups.map((g, gi) => (
-                    <div key={gi} className="rounded bg-ivory/60 p-2">
-                      <div className="text-xs font-semibold text-taupe-deep">{g.group}</div>
-                      <ul className="mt-1 space-y-0.5">{g.items.map((it, ii) => <li key={ii} className="flex justify-between gap-2 text-[11px] text-charcoal/75"><span className="truncate">{it.name}</span><span className="shrink-0 font-medium">{man(it.event)}</span></li>)}</ul>
-                    </div>
-                  ))}
+                  {r.data.groups.map((g, gi) => {
+                    const fb = fbOf(r.key, g.group);
+                    const editing = fbEdit?.month === r.key && fbEdit?.group === fbKey(g.group);
+                    return (
+                      <div key={gi} className="rounded bg-ivory/60 p-2">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <div className="text-xs font-semibold text-taupe-deep">{g.group}</div>
+                          <div className="flex shrink-0 items-center gap-0.5" title="이 이벤트의 반응을 기록하세요 (다음 기획 참고용)">
+                            {(["상", "중", "하"] as const).map((rt) => (
+                              <button key={rt} onClick={() => setRating(r.key, g.group, rt)}
+                                className={`rounded border px-1 py-0 text-[10px] leading-4 ${fb?.rating === rt ? FB_COLORS[rt] : "border-taupe/25 text-charcoal/40 hover:bg-taupe/10"}`}>{rt}</button>
+                            ))}
+                            <button onClick={() => { setFbEdit({ month: r.key, group: fbKey(g.group) }); setFbNote(fb?.note || ""); }}
+                              className={`rounded border border-taupe/25 px-1 py-0 text-[10px] leading-4 ${fb?.note ? "text-taupe-deep" : "text-charcoal/40"} hover:bg-taupe/10`} title={fb?.note || "메모"}>✎</button>
+                          </div>
+                        </div>
+                        {fb?.note && !editing && <div className="mt-0.5 text-[10px] text-charcoal/55">💬 {fb.note}</div>}
+                        {editing && (
+                          <div className="mt-1 flex items-center gap-1">
+                            <input value={fbNote} onChange={(e) => setFbNote(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveNote(r.key, g.group)}
+                              placeholder="반응 메모 (예: 문의 많았음, 전환 낮음)" autoFocus className="min-w-0 flex-1 rounded border border-taupe/30 px-1.5 py-0.5 text-[11px]" />
+                            <button onClick={() => saveNote(r.key, g.group)} className="rounded bg-taupe px-1.5 py-0.5 text-[10px] font-semibold text-white">저장</button>
+                          </div>
+                        )}
+                        <ul className="mt-1 space-y-0.5">{g.items.map((it, ii) => <li key={ii} className="flex justify-between gap-2 text-[11px] text-charcoal/75"><span className="truncate">{it.name}</span><span className="shrink-0 font-medium">{man(it.event)}</span></li>)}</ul>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
