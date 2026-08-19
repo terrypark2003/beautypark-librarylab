@@ -1,7 +1,7 @@
 // 통합 인증/관리 엔드포인트 — /api/auth?action=...  (함수 개수 절약을 위해 단일 함수로 디스패치)
 import {
-  authConfigured, getEmployees, saveEmployees, verifyPw, hashPw,
-  setSessionCookie, clearSessionCookie, readSession, addLog, getLogs,
+  authConfigured, kvConfigured, getEmployees, saveEmployees, verifyPw, hashPw,
+  setSessionCookie, clearSessionCookie, readSession, addLog, getLogs, getFeedback, saveFeedback,
 } from "./_auth";
 
 const uid = () => "e" + Math.random().toString(36).slice(2, 9);
@@ -86,6 +86,36 @@ export default async function handler(req: any, res: any) {
     const act = String(b.action || "").slice(0, 40), detail = String(b.detail || "").slice(0, 140);
     if (act) await addLog({ user: s.name, role: s.role, action: act, detail });
     res.status(200).json({ ok: true });
+    return;
+  }
+
+  // ---- 이벤트 반응 조회(월별·그룹별 상/중/하 + 메모) ----
+  if (action === "feedback-get") {
+    if (!kvConfigured()) { res.status(200).json({ feedback: {}, configured: false }); return; }
+    try { res.status(200).json({ feedback: await getFeedback(), configured: true }); }
+    catch (e: any) { res.status(502).json({ error: String(e?.message || e).slice(0, 120), feedback: {} }); }
+    return;
+  }
+
+  // ---- 이벤트 반응 입력(로그인 사용자, 로그인 게이트 미설정 시 자유 입력) ----
+  if (action === "feedback-set") {
+    if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
+    if (!kvConfigured()) { res.status(400).json({ error: "저장소(KV)가 설정되지 않았습니다" }); return; }
+    const sess = readSession(req);
+    if (authConfigured() && !sess) { res.status(401).json({ error: "로그인이 필요합니다" }); return; }
+    const b = parseBody(req);
+    const month = String(b.month || "").trim(), group = String(b.group || "").trim().slice(0, 120);
+    const rating = String(b.rating || "").trim(), note = String(b.note || "").trim().slice(0, 300);
+    if (!/^\d{4}\.\d{1,2}$/.test(month) || !group) { res.status(400).json({ error: "month(YYYY.M)와 group이 필요합니다" }); return; }
+    if (rating && !["상", "중", "하"].includes(rating)) { res.status(400).json({ error: "rating은 상/중/하 또는 빈값" }); return; }
+    try {
+      const f = await getFeedback();
+      if (!rating && !note) { if (f[month]) { delete f[month][group]; if (!Object.keys(f[month]).length) delete f[month]; } }
+      else { (f[month] ||= {})[group] = { rating, note, by: sess?.name || "미로그인", ts: Date.now() }; }
+      await saveFeedback(f);
+      await addLog({ user: sess?.name || "미로그인", role: sess?.role || "-", action: "이벤트 반응 입력", detail: `${month} ${group.slice(0, 40)}: ${rating || "삭제"}` });
+      res.status(200).json({ ok: true });
+    } catch (e: any) { res.status(502).json({ error: String(e?.message || e).slice(0, 120) }); }
     return;
   }
 

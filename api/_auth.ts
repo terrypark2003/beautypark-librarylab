@@ -36,6 +36,14 @@ export async function getLogs(n = 800): Promise<any[]> {
   return Array.isArray(arr) ? arr.map((s: string) => { try { return JSON.parse(s); } catch { return null; } }).filter(Boolean) : [];
 }
 
+// ---- 이벤트 반응 기록(단일 JSON 블롭: 월 → 그룹 → {rating, note, by, ts}) ----
+export async function getFeedback(): Promise<Record<string, Record<string, any>>> {
+  const raw = await kv(["GET", "bp:feedback"]);
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch { return {}; }
+}
+export const saveFeedback = (f: Record<string, Record<string, any>>) => kv(["SET", "bp:feedback", JSON.stringify(f)]);
+
 // ---- 비밀번호 해시(scrypt) ----
 export function hashPw(pw: string, salt?: string) {
   const s = salt || crypto.randomBytes(12).toString("hex");
