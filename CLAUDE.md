@@ -57,6 +57,12 @@ cd dashboard && npm install && npm run build   # 타입체크 포함 빌드
 
 ## 데이터 관리
 
+- 월별 **기획 초안**은 `tools/plans/YYYY-MM.json`에 남기고, 요청서 엑셀은
+  `python3 tools/build_request_xlsx.py tools/plans/2026-10.json "10월 디자인 작업 요청서.xlsx"`로 생성한다
+  (원내 서식 그대로 — 병합 타이틀·C/D/E 가격열·비고). 기획 배경·검토 항목은
+  `docs/events/YYYY-MM-기획메모.md`에 기록한다.
 - 월별 **확정본**은 `dashboard/src/data/history.json`에 `"YYYY.M"` 키로 추가한다
   (기획 탭이 참고하는 데이터). 형식: `{title, emphasis, groups:[{group, items:[{name, event, normal}]}]}`
 - 확정본 원본(엑셀)은 원내 마스터 파일(`2026_master.xlsx`)에서 관리되므로 repo에는 넣지 않는다
+- 업로드된 첨부(수가표 PDF·마스터 엑셀)는 세션이 끝나면 사라지므로, **재사용할 수치는 반드시
+  repo(plans/메모/history)에 적어둔다.**
