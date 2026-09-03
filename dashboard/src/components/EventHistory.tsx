@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { history, listMonths, label, key, fixedMonths, parseEmphasis, discount, fmtMan, searchItems, type HMonth } from "../lib/history";
+import { history, listMonths, label, key, fixedMonths, parseEmphasis, discount, fmtMan, searchHistory, type HMonth, type SearchResult } from "../lib/history";
 import { fetchFeedback, saveFeedbackEntry, fbKey, type FeedbackMap } from "../lib/auth";
 import { FeedbackChips } from "./FeedbackChips";
 
 const DOT: Record<string, string> = { 상: "bg-emerald-500", 중: "bg-amber-400", 하: "bg-red-400" };
+// 자주 찾는 검색어 — 히스토리에 실제로 여러 번 등장하는 장비·시술
+const QUICK = ["물광주사", "리쥬란", "스킨보톡스", "세르프", "울쎄라", "소프웨이브", "슈링크", "피코슈어토닝", "아쿠아필", "필러", "제모", "플친"];
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** 검색 토큰과 일치하는 부분을 형광펜 표시 */
+function Hi({ text, toks }: { text: string; toks: string[] }) {
+  if (!toks.length) return <>{text}</>;
+  const re = new RegExp(`(${toks.map(esc).join("|")})`, "gi");
+  return <>{text.split(re).map((p, i) => (toks.includes(p.toLowerCase()) ? <mark key={i} className="rounded bg-amber-100 px-0.5 text-inherit">{p}</mark> : p))}</>;
+}
 
 function monthStats(m: HMonth) {
   const items = m.groups.flatMap((g) => g.items);
@@ -47,7 +56,7 @@ export default function EventHistory() {
   }
 
   const totalItems = useMemo(() => months.reduce((n, k) => n + history[k].groups.reduce((a, g) => a + g.items.length, 0), 0), [months]);
-  const results = useMemo(() => searchItems(q), [q]);
+  const results = useMemo(() => searchHistory(q), [q]);
 
   const data = history[sel];
   const idx = months.indexOf(sel);
@@ -64,10 +73,19 @@ export default function EventHistory() {
           <h2 className="font-serif text-2xl text-charcoal">📚 이벤트 히스토리</h2>
           <p className="text-sm text-charcoal/55">{label(months[months.length - 1])} ~ {label(months[0])} · {months.length}개월 · 시술 {totalItems.toLocaleString()}건 · 가격은 부가세 별도</p>
         </div>
-        <div className="flex items-center gap-2">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="시술명 검색 — 예: 물광주사, 세르프, 아이슈링크"
-            className="w-72 rounded-md border border-taupe/30 bg-white px-3 py-2 text-sm" />
-          {q && <button onClick={() => setQ("")} className="text-xs text-charcoal/50 hover:underline">지우기</button>}
+        <div className="w-full md:w-auto">
+          <div className="relative w-full md:w-[26rem]">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/40">🔍</span>
+            <input value={q} onChange={(e) => setQ(e.target.value)} autoFocus={typeof window !== "undefined" && window.innerWidth >= 768}
+              placeholder="시술명·이벤트 제목 검색 (여러 단어 가능: 세르프 울쎄라)"
+              className="w-full rounded-lg border border-taupe/30 bg-white py-2.5 pl-9 pr-16 text-sm shadow-sm focus:border-taupe focus:outline-none" />
+            {q && <button onClick={() => setQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-charcoal/50 hover:underline">지우기</button>}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {QUICK.map((w) => (
+              <button key={w} onClick={() => setQ(w)} className={`rounded-full border px-2 py-0.5 text-[11px] ${q === w ? "border-taupe bg-taupe text-white" : "border-taupe/25 bg-white text-charcoal/60 hover:bg-taupe/10"}`}>{w}</button>
+            ))}
+          </div>
         </div>
       </div>
       {fbErr && <div className="text-xs text-red-600">⚠ 반응 저장 실패: {fbErr}</div>}
@@ -183,24 +201,51 @@ export default function EventHistory() {
   );
 }
 
-function SearchResults({ q, results, onPick }: { q: string; results: ReturnType<typeof searchItems>; onPick: (month: string) => void }) {
-  const monthsHit = new Set(results.map((r) => r.month)).size;
-  const priced = results.filter((r) => r.item.event != null && r.item.event > 0);
+function SearchResults({ q, results, onPick }: { q: string; results: SearchResult; onPick: (month: string) => void }) {
+  const [sort, setSort] = useState<"month" | "price">("month");
+  const { toks, items, groups } = results;
+  const monthsHit = new Set([...items.map((r) => r.month), ...groups.map((g) => g.month)]).size;
+  const priced = items.filter((r) => r.item.event != null && r.item.event > 0);
   const lo = priced.length ? priced.reduce((a, b) => (b.item.event! < a.item.event! ? b : a)) : null;
   const hi = priced.length ? priced.reduce((a, b) => (b.item.event! > a.item.event! ? b : a)) : null;
+  const rows = sort === "price" ? [...items].sort((a, b) => (a.item.event ?? Infinity) - (b.item.event ?? Infinity)) : items;
+  const none = items.length === 0 && groups.length === 0;
   return (
-    <div className="rounded-xl border border-taupe/20 bg-white p-5">
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-        <span className="font-semibold text-charcoal">「{q.trim()}」 {results.length}건</span>
-        {results.length > 0 && <span className="text-charcoal/55">{monthsHit}개월 등장</span>}
-        {lo && hi && lo !== hi && (
-          <span className="text-charcoal/55">이벤트가 최저 <b className="text-taupe-deep">{fmtMan(lo.item.event)}만</b> ({label(lo.month)}) ~ 최고 <b className="text-taupe-deep">{fmtMan(hi.item.event)}만</b> ({label(hi.month)})</span>
-        )}
+    <div className="space-y-4">
+      <div className="rounded-xl border border-taupe/20 bg-white p-5">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+          <span className="font-semibold text-charcoal">「{q.trim()}」 시술 {items.length}건{groups.length > 0 && ` · 이벤트 ${groups.length}건`}</span>
+          {!none && <span className="text-charcoal/55">{monthsHit}개월 등장</span>}
+          {lo && hi && lo !== hi && (
+            <span className="text-charcoal/55">이벤트가 최저 <b className="text-taupe-deep">{fmtMan(lo.item.event)}만</b> ({label(lo.month)}) ~ 최고 <b className="text-taupe-deep">{fmtMan(hi.item.event)}만</b> ({label(hi.month)})</span>
+          )}
+          {items.length > 1 && (
+            <span className="ml-auto flex gap-1 text-[11px]">
+              {(["month", "price"] as const).map((s) => (
+                <button key={s} onClick={() => setSort(s)} className={`rounded border px-2 py-0.5 ${sort === s ? "border-taupe bg-taupe text-white" : "border-taupe/25 text-charcoal/55 hover:bg-taupe/10"}`}>{s === "month" ? "최신순" : "저가순"}</button>
+              ))}
+            </span>
+          )}
+        </div>
+        {none && <p className="py-6 text-center text-sm text-charcoal/45">일치하는 시술·이벤트가 없어요. 더 짧은 단어로 검색해 보세요 (예: "리쥬란", "울쎄라").</p>}
       </div>
-      {results.length === 0 ? (
-        <p className="py-6 text-center text-sm text-charcoal/45">일치하는 시술이 없어요. 띄어쓰기 없이 짧게 검색해 보세요.</p>
-      ) : (
-        <div className="overflow-x-auto">
+
+      {groups.length > 0 && (
+        <div className="rounded-xl border border-taupe/20 bg-white p-5">
+          <div className="mb-2 text-xs font-semibold text-charcoal/50">이벤트 제목 일치</div>
+          <div className="flex flex-wrap gap-2">
+            {groups.map((g, i) => (
+              <button key={i} onClick={() => onPick(g.month)} className="rounded-lg border border-taupe/20 bg-ivory/60 px-3 py-1.5 text-left text-sm hover:bg-taupe/10">
+                <span className="text-xs text-charcoal/50">{label(g.month)} · {g.count}개</span>
+                <div className="font-medium text-taupe-deep"><Hi text={g.group.split("\n")[0]} toks={toks} /></div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {items.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-taupe/20 bg-white p-5">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-taupe/20 text-left text-[11px] text-charcoal/50">
@@ -209,13 +254,13 @@ function SearchResults({ q, results, onPick }: { q: string; results: ReturnType<
               </tr>
             </thead>
             <tbody>
-              {results.map((r, i) => {
+              {rows.map((r, i) => {
                 const d = discount(r.item.normal, r.item.event);
                 return (
                   <tr key={i} className="border-b border-taupe/10 last:border-0 hover:bg-ivory/60">
                     <td className="whitespace-nowrap px-2 py-1.5"><button onClick={() => onPick(r.month)} className="text-taupe-deep hover:underline">{label(r.month)}</button></td>
                     <td className="max-w-[14rem] truncate px-2 py-1.5 text-xs text-charcoal/60" title={r.group}>{r.group.split("\n")[0]}</td>
-                    <td className="px-2 py-1.5 text-charcoal/85">{r.item.name}</td>
+                    <td className="px-2 py-1.5 text-charcoal/85"><Hi text={r.item.name} toks={toks} /></td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-right text-xs text-charcoal/40 line-through">{r.item.normal ? `${fmtMan(r.item.normal)}만` : ""}</td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-right font-semibold text-taupe-deep">{r.item.event != null ? `${fmtMan(r.item.event)}만` : "—"}</td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-right text-[11px] text-emerald-700">{d != null ? `${d}%↓` : ""}</td>
