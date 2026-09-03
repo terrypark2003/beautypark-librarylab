@@ -54,7 +54,7 @@ const fromHistory = (h: HMonth): PGroup[] =>
     items: g.items.map((it) => ({ name: it.name, normal: it.normal != null ? String(it.normal) : "", event: it.event != null ? String(it.event) : "" })),
   }));
 
-export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestData) => void }) {
+export default function PlanningView({ onGenerate, onOpenHistory }: { onGenerate: (d: RequestData) => void; onOpenHistory?: () => void }) {
   const init = nextMonth(latest().y, latest().m);
   const [y, setY] = useState(init.y);
   const [m, setM] = useState(init.m);
@@ -251,6 +251,7 @@ export default function PlanningView({ onGenerate }: { onGenerate: (d: RequestDa
           <h3 className="font-serif text-lg text-taupe-deep">📚 과거 참고 ({m}월 라인업)</h3>
           <span className="text-[11px] text-charcoal/45">각 이벤트 옆 상/중/하로 반응을 기록해두면 다음 기획 때 참고돼요</span>
           {fbErr && <span className="text-[11px] text-red-600">⚠ {fbErr}</span>}
+          {onOpenHistory && <button onClick={onOpenHistory} className="ml-auto text-xs font-medium text-taupe-deep hover:underline">전체 히스토리 보기 →</button>}
         </div>
         <div className="grid gap-3 lg:grid-cols-3">
           {refs.map((r) => (
