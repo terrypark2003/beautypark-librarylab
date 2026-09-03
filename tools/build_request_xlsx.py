@@ -14,6 +14,8 @@ E=D×1.1 · I=비고)을 그대로 만들어, 광고 에이전시 전달본으�
                  "items": [{"name": "...", "normal": 435000, "event": 330000, "note": "..."}]}]}
 
 `afterEmphasis: true`인 그룹(런칭 등 장기 이벤트)은 월초/중순 강조 블록 아래에 배치된다.
+`sortItemsByPrice: true`(계획 최상위)면 각 그룹의 시술을 이벤트가 오름차순으로 나열한다 —
+`옵션가)`가 들어간 줄은 맨 아래로 보내고, 같은 가격·가격 미정은 원래 순서를 유지한다(원내 검수 요청 관례).
 가격 규칙은 CLAUDE.md 참조 — 정상가는 최신 수가표 PDF가 유일한 진실원천이며
 n회권 정상가는 반드시 1회가×n으로 검산할 것.
 """
@@ -64,10 +66,20 @@ def write_header(ws, title):
             ws.cell(row=row, column=col).border = BORDER
 
 
-def write_groups(ws, groups, row):
+def sort_items(items):
+    """이벤트가 오름차순. 옵션가 줄은 맨 아래, 가격 미정은 그 다음. 안정 정렬이라 동가는 원래 순서."""
+    def key(item):
+        is_option = "옵션가)" in item["name"]
+        event = item.get("event")
+        return (is_option, event is None, event if event is not None else 0)
+    return sorted(items, key=key)
+
+
+def write_groups(ws, groups, row, sort_by_price=False):
     for group in groups:
         start = row
-        for item in group["items"]:
+        items = sort_items(group["items"]) if sort_by_price else group["items"]
+        for item in items:
             event = item["event"]
             ws.cell(row=row, column=2, value=item["name"])
             if item.get("normal"):
@@ -116,12 +128,13 @@ def build(plan, out_path):
 
     monthly = [g for g in plan["groups"] if not g.get("afterEmphasis")]
     trailing = [g for g in plan["groups"] if g.get("afterEmphasis")]
-    row = write_groups(ws, monthly, 5)
+    by_price = bool(plan.get("sortItemsByPrice"))
+    row = write_groups(ws, monthly, 5, by_price)
     if plan.get("emphasis"):
         write_emphasis(ws, plan["emphasis"], row)
         row += 2
     if trailing:
-        write_groups(ws, trailing, row)
+        write_groups(ws, trailing, row, by_price)
 
     for col, width in (
         ("A", 34), ("B", 60), ("C", 13), ("D", 13),
