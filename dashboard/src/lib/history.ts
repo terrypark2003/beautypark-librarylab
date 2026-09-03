@@ -44,15 +44,29 @@ export function parseEmphasis(e: string): { wolcho?: string; jungsun?: string } 
   return { wolcho: w1?.[1].trim(), jungsun: w2?.[1].trim() };
 }
 
-/** 시술명 검색(공백 무시) — 최신 월부터 */
-export function searchItems(q: string): { month: string; group: string; item: HItem }[] {
-  const needle = q.trim().toLowerCase().replace(/\s+/g, "");
-  if (!needle) return [];
-  const out: { month: string; group: string; item: HItem }[] = [];
+/** 검색 정규화: 소문자 + 공백 제거 ("물광 주사" == "물광주사") */
+export const normText = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+/** 검색어를 토큰으로 — 띄어쓴 단어는 모두 포함돼야 매칭(AND) */
+export const searchTokens = (q: string) => q.toLowerCase().split(/\s+/).map((s) => s.trim()).filter(Boolean);
+export const matchesAll = (text: string, toks: string[]) => { const h = normText(text); return toks.every((tk) => h.includes(tk)); };
+
+export interface SearchResult {
+  toks: string[];
+  /** 시술명이 일치한 항목 — 최신 월부터 */
+  items: { month: string; group: string; item: HItem }[];
+  /** 이벤트(그룹) 제목이 일치한 그룹 — 최신 월부터 */
+  groups: { month: string; group: string; count: number }[];
+}
+/** 시술명·이벤트 제목 검색(공백 무시, 여러 단어 AND) */
+export function searchHistory(q: string): SearchResult {
+  const toks = searchTokens(q);
+  const out: SearchResult = { toks, items: [], groups: [] };
+  if (!toks.length) return out;
   for (const k of listMonths().reverse())
-    for (const g of history[k].groups)
-      for (const it of g.items)
-        if (it.name.toLowerCase().replace(/\s+/g, "").includes(needle)) out.push({ month: k, group: g.group, item: it });
+    for (const g of history[k].groups) {
+      if (matchesAll(g.group, toks)) out.groups.push({ month: k, group: g.group, count: g.items.length });
+      for (const it of g.items) if (matchesAll(it.name, toks)) out.items.push({ month: k, group: g.group, item: it });
+    }
   return out;
 }
 
