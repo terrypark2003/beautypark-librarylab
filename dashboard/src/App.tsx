@@ -3,6 +3,7 @@ import type { RequestData } from "./lib/types";
 import PlanningView from "./components/PlanningView";
 import PosterStudio from "./components/PosterStudio";
 import EventHub from "./components/EventHub";
+import EventHistory from "./components/EventHistory";
 import { BrandPanel, ChannelsPanel, CalendarPanel, ChecklistPanel } from "./components/Panels";
 import CostMeter from "./components/CostMeter";
 import Login from "./components/Login";
@@ -14,6 +15,7 @@ const FLOW = [
   { id: "posters", label: "② 디자인 생성", hint: "배경 + 포스터" },
 ] as const;
 const REF = [
+  { id: "history", label: "📚 이벤트 히스토리", hint: "지난 이벤트 · 가격 흐름" },
   { id: "copy", label: "카피 덱(텍스트)", hint: "엑셀 → 카피" },
   { id: "brand", label: "브랜드 가이드", hint: "로고 · 컬러" },
   { id: "channels", label: "채널 · 계정", hint: "바로가기" },
@@ -22,10 +24,14 @@ const REF = [
 ] as const;
 
 type TabId = (typeof FLOW)[number]["id"] | (typeof REF)[number]["id"] | "admin";
+const TAB_IDS = new Set<string>([...FLOW.map((t) => t.id), ...REF.map((t) => t.id), "admin"]);
+// URL 해시(#history 등)로 탭 딥링크 — 북마크·공유용
+const tabFromHash = (): TabId => { const h = location.hash.replace(/^#/, "").split("?")[0]; return (TAB_IDS.has(h) ? h : "plan") as TabId; };
 
 export default function App() {
   const [me, setMe] = useState<Me | null>(null); // null = 로딩 중
-  const [tab, setTab] = useState<TabId>("plan");
+  const [tab, setTabState] = useState<TabId>(tabFromHash);
+  const setTab = (id: TabId) => { setTabState(id); history.replaceState(null, "", `#${id}`); };
   const [planData, setPlanData] = useState<RequestData | null>(null);
 
   useEffect(() => { fetchMe().then(setMe); }, []);
@@ -55,13 +61,13 @@ export default function App() {
           <div className="text-xs text-charcoal/60">뷰티파크의원 범어점 · 운영 대시보드</div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:gap-0.5">
-          <div className="px-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-charcoal/35 md:pt-0">워크플로우</div>
+          <div className="whitespace-nowrap px-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-charcoal/35 md:pt-0">워크플로우</div>
           {FLOW.map((t) => <NavBtn key={t.id} {...t} />)}
-          <div className="px-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-charcoal/35">참고자료</div>
+          <div className="whitespace-nowrap px-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-charcoal/35">참고자료</div>
           {REF.map((t) => <NavBtn key={t.id} {...t} />)}
           {isAdmin && (
             <>
-              <div className="px-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-charcoal/35">관리</div>
+              <div className="whitespace-nowrap px-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-charcoal/35">관리</div>
               <NavBtn id="admin" label="🛠 관리자" hint="직원 · 사용 로그" />
             </>
           )}
@@ -76,8 +82,9 @@ export default function App() {
 
       <main className="flex-1 overflow-x-hidden">
         <div className="mx-auto max-w-6xl p-5 md:p-8">
-          {tab === "plan" && <PlanningView onGenerate={(d) => { setPlanData(d); setTab("posters"); }} />}
+          {tab === "plan" && <PlanningView onGenerate={(d) => { setPlanData(d); setTab("posters"); }} onOpenHistory={() => setTab("history")} />}
           {tab === "posters" && <PosterStudio initialData={planData} />}
+          {tab === "history" && <EventHistory />}
           {tab === "copy" && <EventHub />}
           {tab === "brand" && <BrandPanel />}
           {tab === "channels" && <ChannelsPanel />}
