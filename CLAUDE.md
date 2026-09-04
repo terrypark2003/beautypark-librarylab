@@ -75,6 +75,7 @@ cd dashboard && npm install && npm run build   # 타입체크 포함 빌드
   `docs/events/YYYY-MM-기획메모.md`에 기록한다.
 - 월별 **확정본**은 `dashboard/src/data/history.json`에 `"YYYY.M"` 키로 추가한다
   (기획 탭이 참고하는 데이터). 형식: `{title, emphasis, groups:[{group, items:[{name, event, normal}]}]}`
+- 원내 **패키지 카탈로그**(부가세 포함가)와 분석은 `docs/packages/`에 둔다 — n회권·프로그램 정가는 여기서 먼저 찾는다
 - 확정본 원본(엑셀)은 원내 마스터 파일(`2026_master.xlsx`)에서 관리되므로 repo에는 넣지 않는다
 - 업로드된 첨부(수가표 PDF·마스터 엑셀)는 세션이 끝나면 사라지므로, **재사용할 수치는 반드시
   repo(plans/메모/history)에 적어둔다.**
