@@ -56,3 +56,23 @@
 - 신규 고정 해시태그 세트 최종 승인([04-design-specs.md](04-design-specs.md) 초안)
 - 외주 SEO 블로그를 내부 전환할지 / 외주 유지할지
 - 브랜드 컬러 **정확 HEX** 확정(현재 로고 이미지에서 추정값 기록 — 원본 파일/브랜드 가이드 수치로 확정 권장)
+
+## Vercel 배포 보호 — 실제 동작 확인 (2026-09-30)
+
+설정 이름만 보고 판단했다가 틀린 적이 있어 **로그인 없이 `curl`로 직접 확인한 결과**를 남긴다.
+
+| 주소 | 결과 | 의미 |
+| --- | --- | --- |
+| `beautypark-librarylab.vercel.app` (대시보드 프로덕션) | **200 · 공개** | 누구나 열람 가능 |
+| `beautypark-librarylab.vercel.app/api/auth?action=me` | `{"configured":false}` | 앱 자체 로그인도 꺼져 있음 |
+| 해시 배포 URL (`…-j5zhh1f1v.vercel.app`) | 302 → Vercel 로그인 | 이것만 보호됨 |
+
+- 팀 기본값 **Standard Protection**(API 값 `all_except_custom_domains`)은 프로덕션 주소를 **막지 않는다**.
+  이전에 "커스텀 도메인이 없으니 모든 주소가 로그인 벽 뒤"라고 판단한 것은 **오류**였다.
+- ⚠️ **위험: 대시보드가 공개 상태이고 로그인도 꺼져 있다.**
+  - `api/packages.ts`·`api/title.ts`·`api/palette.ts`·`api/stock*.ts`는 로그인 검사가 없고
+    `ANTHROPIC_API_KEY`·`GEMINI_API_KEY`를 쓴다 → 주소를 아는 누구나 AI 기능을 호출해 **API 요금을 쓸 수 있다**.
+  - 이벤트 히스토리(`history.json`)는 프런트 번들에 들어 있어 공개 열람된다(대부분 이미 포스터로 공개된 가격).
+- **해결책(대표 결정 필요)**: Vercel 환경변수에 KV 연결 + `ADMIN_PASSWORD`를 설정하면 앱 로그인 게이트가 켜진다
+  (`api/_auth.ts`의 `authConfigured()`). 그다음 위 API들에도 `auth.ts`처럼 로그인 검사를 붙인다.
+
