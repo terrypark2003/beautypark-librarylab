@@ -23,6 +23,22 @@
 
 빌드 단계가 없다. Vercel 프로젝트의 **Root Directory = `tv`**, Framework = Other로 두면 그대로 배포된다.
 
+## 배포 절차 (최초 1회 · Vercel 대시보드에서 직접)
+
+Claude의 Vercel 연결 계정에는 팀 프로젝트 **생성 권한이 없다**(2026-09-30 `create project` 403). 사람이 한 번 만들어야 한다.
+
+1. vercel.com → 팀 `bpconsultation2025-6801s-projects` → **Add New → Project**
+2. `terrypark2003/beautypark-librarylab` **Import**
+3. Project Name **`beautypark-tv`** → 주소가 `beautypark-tv.vercel.app`이 된다
+4. Root Directory **Edit → `tv`** 선택
+5. Framework Preset **Other** · Build/Output 설정은 비워 둔다
+6. **Deploy**
+7. ⚠️ **Settings → Deployment Protection → Vercel Authentication을 "Only Preview Deployments"(또는 끔)로.**
+   기본값이 전체 보호면 직원이 Vercel 로그인 벽에 막힌다(대시보드 `beautypark-librarylab`이 지금 그 상태).
+   이 페이지에는 병원 데이터가 전혀 없어서(가격·이벤트·고객 정보 없음, 이미지도 서버로 안 감) 공개해도 된다.
+
+이후 main에 `tv/`가 바뀌면 자동 재배포된다.
+
 ## 로컬에서 확인
 
 ```bash
