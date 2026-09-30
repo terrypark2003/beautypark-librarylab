@@ -1,7 +1,8 @@
 # beautypark-tv — 디스플레이 영상 만들기
 
 이벤트 포스터 이미지를 올리면 대기실 TV·토스 단말기에서 재생할 **1920×1080 슬라이드 영상(mp4)** 으로 만들어 내려받게 하는 웹 도구.
-배포 주소: **https://beautypark-tv.vercel.app**
+배포 주소: **https://beautypark-librarylab-tv.vercel.app** (프로젝트 이름이 `beautypark-librarylab-tv`로 만들어짐)
+`beautypark-tv.vercel.app`으로 쓰려면 Vercel **Settings → Domains → Add**에서 그 주소를 추가한다(Claude 연결 계정은 권한 없음 · 403).
 
 ## 동작 방식
 
@@ -35,9 +36,9 @@ Claude의 Vercel 연결 계정에는 팀 프로젝트 **생성 권한이 없다*
 4. Root Directory **Edit → `tv`** 선택
 5. Framework Preset은 무엇이든 상관없다(`tv/vercel.json`이 덮어씀) · 그래도 헷갈리지 않게 **Other** 권장
 6. **Deploy**
-7. ⚠️ **Settings → Deployment Protection → Vercel Authentication을 "Only Preview Deployments"(또는 끔)로.**
-   기본값이 전체 보호면 직원이 Vercel 로그인 벽에 막힌다(대시보드 `beautypark-librarylab`이 지금 그 상태).
-   이 페이지에는 병원 데이터가 전혀 없어서(가격·이벤트·고객 정보 없음, 이미지도 서버로 안 감) 공개해도 된다.
+7. Deployment Protection은 **기본값(Standard Protection) 그대로 둬도 된다.**
+   Standard Protection은 해시 배포 URL·프리뷰만 막고 **프로덕션 주소(`<프로젝트>.vercel.app`)는 공개**한다.
+   2026-09-30 로그인 없이 `curl`로 확인: 프로덕션 주소 200 · 해시 배포 URL 302(로그인 페이지로 이동).
 
 이후 main에 `tv/`가 바뀌면 자동 재배포된다.
 
