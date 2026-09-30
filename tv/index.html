@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>뷰티파크 디스플레이 영상 만들기</title>
+<meta name="description" content="이벤트 포스터 이미지를 올리면 대기실 TV용 영상으로 만들어 줍니다.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header>
+  <h1>디스플레이 영상 만들기</h1>
+  <p class="sub">이벤트 포스터를 올리면 대기실 TV에서 재생할 영상으로 만들어 드립니다. 파일은 <b>이 컴퓨터 안에서만</b> 처리되고 어디로도 전송되지 않습니다.</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2><span class="n">1</span> 이미지 올리기</h2>
+    <div id="drop" class="drop">
+      <p class="big">여기로 이미지를 끌어다 놓으세요</p>
+      <p class="small">또는</p>
+      <button id="pick" class="btn">파일 선택</button>
+      <input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" multiple hidden>
+      <p class="hint">JPG · PNG · WEBP · BMP · 여러 장 한 번에 가능</p>
+    </div>
+    <ul id="list" class="list"></ul>
+    <p id="empty" class="muted">아직 올린 이미지가 없습니다.</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">2</span> 설정</h2>
+    <div class="grid">
+      <label>장당 노출
+        <div class="row"><input id="sec" type="range" min="2" max="12" step="0.5" value="6"><output id="secOut">6.0초</output></div>
+        <span class="hint">글자가 많은 포스터는 8초 정도가 읽기 편합니다.</span>
+      </label>
+      <label>전환 효과
+        <div class="row"><input id="fade" type="range" min="0" max="2" step="0.1" value="0.8"><output id="fadeOut">0.8초</output></div>
+        <span class="hint">0으로 두면 툭툭 바뀝니다.</span>
+      </label>
+      <label>화면 크기
+        <select id="size">
+          <option value="1920x1080" selected>1920 × 1080 (FHD · 기본)</option>
+          <option value="3840x2160">3840 × 2160 (4K)</option>
+          <option value="1280x720">1280 × 720 (가벼움)</option>
+        </select>
+        <span class="hint">TV가 4K가 아니면 FHD로 충분합니다.</span>
+      </label>
+      <label>파일 이름
+        <input id="name" type="text" value="bp 디스플레이 영상" spellcheck="false">
+        <span class="hint">예: <code>10 bp 디스플레이 영상</code></span>
+      </label>
+    </div>
+    <p id="spec" class="spec"></p>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">3</span> 만들기</h2>
+    <p class="warn" id="warn" hidden></p>
+    <button id="go" class="btn primary" disabled>영상 만들기</button>
+    <div id="prog" class="prog" hidden>
+      <div class="bar"><i id="barFill"></i></div>
+      <p id="progText" class="muted"></p>
+      <p class="hint">만드는 동안 <b>이 탭을 화면 앞에 두세요.</b> 다른 탭으로 넘어가면 영상이 끊깁니다.</p>
+    </div>
+    <div id="done" class="done" hidden>
+      <video id="preview" controls playsinline></video>
+      <a id="dl" class="btn primary" download>내려받기</a>
+      <button id="again" class="btn">다시 만들기</button>
+      <p id="doneInfo" class="muted"></p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>뷰티파크의원 범어점 · 원내 전용 도구</p>
+</footer>
+<script src="./app.js"></script>
+</body>
+</html>
