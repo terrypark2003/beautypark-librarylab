@@ -77,6 +77,8 @@ cd dashboard && npm install && npm run build   # 타입체크 포함 빌드
 - 월별 **확정본**은 `dashboard/src/data/history.json`에 `"YYYY.M"` 키로 추가한다
   (기획 탭이 참고하는 데이터). 형식: `{title, emphasis, groups:[{group, items:[{name, event, normal}]}]}`
 - 원내 **패키지 카탈로그**(부가세 포함가)와 분석·개편안(v2)은 `docs/packages/`에 둔다 — n회권·프로그램 정가는 여기서 먼저 찾는다
+- **원내 디스플레이 영상**(대기실 TV·토스 단말기)은 에이전시 업무 범위 밖이라 직접 만든다 — 1920×1080 이미지를 받아
+  `python3 tools/build_display_video.py <이미지폴더> "<출력이름>"`로 mp4·3gp 생성. 스펙·주의사항은 `docs/04-display-video.md`
 - **인스타·대행사 협업 문서**(기획안 회신·브랜딩 결정)는 `docs/instagram/`에 둔다. 대외 회신은 병원 기본정보(`docs/01`)·검수 루프(`docs/07`)·브랜드 가이드(`docs/10`)와 어긋나지 않게 쓴다
 - **네이버 플레이스 리뷰 등 채널 운영 방침**(원장 결정·역할 분담)은 `docs/reviews/`에 둔다 — 업체 리뷰 진행은 한시적(1건/일)·지속하지 않음, 리뷰 요청의 기본은 원내 루틴, 변동 시 문서 업데이트
 - **외부 플랫폼 특가전**(세이프닥·강남언니 등) 가격 검토는 `docs/channels/`에 둔다 — 표기 정가는 반드시 원내 정가와 일치시키고, 원내 이벤트·희소 슬롯 가격을 밑돌지 않는지 대조한다
