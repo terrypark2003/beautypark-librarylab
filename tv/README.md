@@ -21,7 +21,9 @@
 | `style.css` | 브랜드 팔레트(웜 토프 #8C7E6E · 아이보리 #F7F4EF) |
 | `vercel.json` | 정적 호스팅 헤더 |
 
-빌드 단계가 없다. Vercel 프로젝트의 **Root Directory = `tv`**, Framework = Other로 두면 그대로 배포된다.
+소스에는 빌드가 필요 없다. 다만 Vercel이 프레임워크를 **Vite로 자동 감지해 `vite build`를 돌리다 실패**한 적이 있어(2026-09-30),
+`tv/vercel.json`에 `framework: null` · 설치 생략 · `dist/`로 복사하는 빌드 명령을 **명시**해 두었다.
+그래서 대시보드의 Framework 설정이 무엇이든 이 파일이 우선한다. Root Directory만 `tv`면 된다.
 
 ## 배포 절차 (최초 1회 · Vercel 대시보드에서 직접)
 
@@ -31,7 +33,7 @@ Claude의 Vercel 연결 계정에는 팀 프로젝트 **생성 권한이 없다*
 2. `terrypark2003/beautypark-librarylab` **Import**
 3. Project Name **`beautypark-tv`** → 주소가 `beautypark-tv.vercel.app`이 된다
 4. Root Directory **Edit → `tv`** 선택
-5. Framework Preset **Other** · Build/Output 설정은 비워 둔다
+5. Framework Preset은 무엇이든 상관없다(`tv/vercel.json`이 덮어씀) · 그래도 헷갈리지 않게 **Other** 권장
 6. **Deploy**
 7. ⚠️ **Settings → Deployment Protection → Vercel Authentication을 "Only Preview Deployments"(또는 끔)로.**
    기본값이 전체 보호면 직원이 Vercel 로그인 벽에 막힌다(대시보드 `beautypark-librarylab`이 지금 그 상태).
