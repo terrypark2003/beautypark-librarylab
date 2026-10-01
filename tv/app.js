@@ -172,90 +172,112 @@ const ease = (a) => (1 - Math.cos(Math.PI * a)) / 2;
 async function build() {
   if (busy || !slides.length || !MIME) return;
   busy = true; render();
+  hideError();
   $('go').hidden = true; $('done').hidden = true; $('prog').hidden = false;
+  $('barFill').style.width = '0%';
+  $('progText').textContent = '준비 중…';
 
-  const { w: W, h: H, sec, fade, fps } = settings();
-  const n = slides.length, total = totalSec(n, sec, fade), step = sec - fade;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d', { alpha: false });
-  const frame = makeFrames(W, H);
-
-  /* 시각 t의 화면. 장 j는 j·step에 등장하기 시작해 fade초 동안 앞 장 위로 서서히 올라온다.
-   * (이전 버전은 전환 시작 순간 이미 다음 장으로 넘어가 버려서 섞이는 구간이 아예 없었다) */
-  function paint(t) {
-    let j = step > 0 ? Math.floor(t / step) : 0;
-    if (j > n - 1) j = n - 1;
-    if (fade > 0 && j >= 1 && t < j * step + fade) {
-      ctx.globalAlpha = 1; ctx.drawImage(frame(j - 1), 0, 0);
-      ctx.globalAlpha = ease((t - j * step) / fade); ctx.drawImage(frame(j), 0, 0);
-      ctx.globalAlpha = 1;
-    } else {
-      ctx.drawImage(frame(j), 0, 0);
-    }
-  }
-
-  const stream = canvas.captureStream(fps);
-  const bitrate = Math.round(W * H * fps * 0.11);   // 1080p30 ≈ 6.8Mbps
-  let rec;
+  let stream = null, rec = null;
   try {
-    rec = new MediaRecorder(stream, { mimeType: MIME, videoBitsPerSecond: bitrate });
-  } catch {
-    rec = new MediaRecorder(stream, { mimeType: MIME });
-  }
-  const chunks = [];
-  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-  const stopped = new Promise((res) => { rec.onstop = res; });
+    const { w: W, h: H, sec, fade, fps } = settings();
+    const n = slides.length, total = totalSec(n, sec, fade), step = sec - fade;
 
-  paint(0);   // 첫 장을 미리 그려 두고 시작 (검은 프레임 방지)
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const frame = makeFrames(W, H);
 
-  rec.start(1000);
-  const t0 = performance.now();
-
-  await new Promise((done) => {
-    function frame(now) {
-      const t = (now - t0) / 1000;
-      if (t >= total) { done(); return; }
-
-      paint(t);
-
-      const p = Math.min(t / total, 1);
-      $('barFill').style.width = (p * 100).toFixed(1) + '%';
-      $('progText').textContent = `만드는 중… ${Math.round(p * 100)}%  (남은 시간 약 ${fmt(Math.max(total - t, 0))})`;
-      requestAnimationFrame(frame);
+    /* 시각 t의 화면. 장 j는 j·step에 등장하기 시작해 fade초 동안 앞 장 위로 서서히 올라온다. */
+    function paint(t) {
+      let j = step > 0 ? Math.floor(t / step) : 0;
+      j = Math.max(0, Math.min(j, n - 1));          // 범위 밖 장 번호는 절대 그리지 않는다
+      if (fade > 0 && j >= 1 && t < j * step + fade) {
+        ctx.globalAlpha = 1; ctx.drawImage(frame(j - 1), 0, 0);
+        ctx.globalAlpha = ease((t - j * step) / fade); ctx.drawImage(frame(j), 0, 0);
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.drawImage(frame(j), 0, 0);
+      }
     }
-    requestAnimationFrame(frame);
-  });
 
-  // 마지막 장을 0.4초 더 유지해 TV 반복 재생 시 끝이 뚝 끊기지 않게 한다.
-  // captureStream은 캔버스를 다시 그릴 때만 프레임을 내보내므로, 기다리는 동안에도 계속 그려야 길이가 늘어난다.
-  await new Promise((done) => {
-    const tEnd = performance.now() + 400;
-    (function hold(now) {
-      ctx.drawImage(frame(n - 1), 0, 0);
-      if (now < tEnd) requestAnimationFrame(hold); else done();
-    })(performance.now());
-  });
+    stream = canvas.captureStream(fps);
+    const bitrate = Math.round(W * H * fps * 0.11);   // 1080p30 ≈ 6.8Mbps
+    try {
+      rec = new MediaRecorder(stream, { mimeType: MIME, videoBitsPerSecond: bitrate });
+    } catch {
+      rec = new MediaRecorder(stream, { mimeType: MIME });
+    }
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise((res) => { rec.onstop = res; });
+    const recError = new Promise((_, rej) => { rec.onerror = (e) => rej(e.error || new Error('녹화기 오류')); });
 
-  rec.stop();
-  stream.getTracks().forEach((t) => t.stop());
-  await stopped;
+    paint(0);   // 첫 장을 미리 그려 두고 시작 (검은 프레임 방지)
+    rec.start(1000);
 
-  const blob = new Blob(chunks, { type: MIME.split(';')[0] });
-  if (lastURL) URL.revokeObjectURL(lastURL);
-  lastURL = URL.createObjectURL(blob);
+    /* 시작 시각은 '첫 프레임이 실제로 그려지는 순간'으로 잡는다.
+     * requestAnimationFrame이 넘겨주는 시각은 호출 직전의 performance.now()보다 이를 수 있어서,
+     * 미리 잡아 두면 경과 시간이 음수가 되고 −1번째 장을 그리려다 멈춘다(2026-10-01 실제 발생). */
+    await Promise.race([recError, new Promise((done, fail) => {
+      let t0 = null;
+      function tick(now) {
+        try {
+          if (t0 === null) t0 = now;
+          const t = (now - t0) / 1000;
+          if (t >= total) { done(); return; }
+          paint(t);
+          const p = Math.min(t / total, 1);
+          $('barFill').style.width = (p * 100).toFixed(1) + '%';
+          $('progText').textContent = `만드는 중… ${Math.round(p * 100)}%  (남은 시간 약 ${fmt(Math.max(total - t, 0))})`;
+          requestAnimationFrame(tick);
+        } catch (err) { fail(err); }
+      }
+      requestAnimationFrame(tick);
+    })]);
 
-  const base = ($('name').value || 'bp 디스플레이 영상').trim().replace(/[\\/:*?"<>|]/g, '');
-  $('preview').src = lastURL;
-  $('dl').href = lastURL;
-  $('dl').download = `${base}.${EXT}`;
-  $('doneInfo').textContent =
-    `${base}.${EXT} · ${W}×${H} · ${fmt(total)} · ${(blob.size / 1048576).toFixed(1)} MB`;
+    // 마지막 장을 0.4초 더 유지해 TV 반복 재생 시 끝이 뚝 끊기지 않게 한다.
+    // captureStream은 캔버스를 다시 그릴 때만 프레임을 내보내므로, 기다리는 동안에도 계속 그려야 길이가 늘어난다.
+    await new Promise((done) => {
+      const tEnd = performance.now() + 400;
+      (function hold(now) {
+        ctx.drawImage(frame(n - 1), 0, 0);
+        if (now < tEnd) requestAnimationFrame(hold); else done();
+      })(performance.now());
+    });
 
-  $('prog').hidden = true; $('done').hidden = false;
-  busy = false; render();
+    rec.stop();
+    stream.getTracks().forEach((tr) => tr.stop());
+    await stopped;
+
+    const blob = new Blob(chunks, { type: MIME.split(';')[0] });
+    if (!blob.size) throw new Error('녹화된 영상이 비어 있습니다');
+    if (lastURL) URL.revokeObjectURL(lastURL);
+    lastURL = URL.createObjectURL(blob);
+
+    const base = ($('name').value || 'bp 디스플레이 영상').trim().replace(/[\\/:*?"<>|]/g, '');
+    $('preview').src = lastURL;
+    $('dl').href = lastURL;
+    $('dl').download = `${base}.${EXT}`;
+    $('doneInfo').textContent =
+      `${base}.${EXT} · ${W}×${H} · ${fmt(total)} · ${(blob.size / 1048576).toFixed(1)} MB`;
+
+    $('prog').hidden = true; $('done').hidden = false;
+  } catch (err) {
+    // 어떤 오류든 화면에 알리고 처음 상태로 되돌린다 — 다시는 진행 막대에서 조용히 멈추지 않게.
+    console.error(err);
+    try { if (rec && rec.state !== 'inactive') rec.stop(); } catch { /* 무시 */ }
+    if (stream) stream.getTracks().forEach((tr) => tr.stop());
+    $('prog').hidden = true; $('go').hidden = false;
+    showError('영상을 만들다 멈췄습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요. '
+      + '같은 일이 반복되면 이 문구를 캡처해 알려 주세요.<br><code>' + escapeHTML(String(err && err.message || err)) + '</code>');
+  } finally {
+    busy = false; render();
+  }
 }
+
+function showError(html) { const el = $('err'); el.innerHTML = html; el.hidden = false; }
+function hideError() { $('err').hidden = true; }
+function escapeHTML(s) { return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 /* ---- 이벤트 연결 ---- */
 $('pick').addEventListener('click', () => $('file').click());
