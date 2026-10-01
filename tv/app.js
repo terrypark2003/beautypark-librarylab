@@ -108,11 +108,17 @@ function remove(i) {
 const settings = () => {
   const [w, h] = $('size').value.split('x').map(Number);
   const sec = parseFloat($('sec').value);
-  let fade = parseFloat($('fade').value);
-  if (fade >= sec) fade = Math.max(0, sec - 0.5);   // 페이드가 노출보다 길 수 없다
+  // 전환은 장당 노출의 40%까지만. 그래야 앞뒤 전환 사이에 포스터가 또렷하게 멈춰 있는 시간이 남는다.
+  const fade = Math.min(parseFloat($('fade').value), fadeMax(sec));
   return { w, h, sec, fade, fps: 30 };
 };
 const totalSec = (n, sec, fade) => (n ? sec * n - fade * (n - 1) : 0);
+const fadeMax = (sec) => Math.min(2, Math.round(sec * 0.4 * 10) / 10);
+
+/* 장당 노출을 바꾸면 전환 슬라이더의 최대값도 따라 바뀐다 (범위 밖 값은 브라우저가 자동으로 끌어내림) */
+function syncFadeMax() {
+  $('fade').max = String(fadeMax(parseFloat($('sec').value)));
+}
 
 function updateSpec() {
   const { w, h, sec, fade } = settings();
@@ -129,13 +135,38 @@ function fmt(s) {
 }
 
 /* ---- 캔버스에 한 장 그리기 (비율 유지 · 레터박스) ---- */
-function drawFit(ctx, img, W, H, alpha) {
+function drawFit(ctx, img, W, H) {
   const s = Math.min(W / img.naturalWidth, H / img.naturalHeight);
   const w = img.naturalWidth * s, h = img.naturalHeight * s;
-  ctx.globalAlpha = alpha;
   ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
-  ctx.globalAlpha = 1;
 }
+
+/* ---- 장마다 '검은 여백까지 포함한 완성 화면'을 미리 그려 두고, 그 두 장을 섞는다 ----
+ * 이미지만 겹쳐 그리면 가로형 → 세로형으로 넘어갈 때 앞 장의 양옆이 페이드되지 않고 남았다가
+ * 전환이 끝나는 순간 툭 꺼진다. 완성 화면끼리 섞으면 여백까지 함께 부드럽게 바뀐다.
+ * 장은 앞으로만 넘어가므로 캔버스 2장만 돌려 쓴다(4K에서도 메모리 부담 없음). */
+function makeFrames(W, H) {
+  const cache = new Map();
+  return (k) => {
+    if (cache.has(k)) return cache.get(k);
+    let c;
+    if (cache.size >= 2) {
+      const old = Math.min(...cache.keys());
+      c = cache.get(old); cache.delete(old);
+    } else {
+      c = document.createElement('canvas'); c.width = W; c.height = H;
+    }
+    const x = c.getContext('2d', { alpha: false });
+    x.imageSmoothingQuality = 'high';
+    x.fillStyle = '#000'; x.fillRect(0, 0, W, H);
+    drawFit(x, slides[k].img, W, H);
+    cache.set(k, c);
+    return c;
+  };
+}
+
+/* 천천히 시작해 천천히 끝나는 곡선. 직선으로 섞으면 시작·끝이 덜컥거려 보인다. */
+const ease = (a) => (1 - Math.cos(Math.PI * a)) / 2;
 
 /* ---- 영상 만들기 ---- */
 async function build() {
@@ -149,7 +180,21 @@ async function build() {
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d', { alpha: false });
-  ctx.imageSmoothingQuality = 'high';
+  const frame = makeFrames(W, H);
+
+  /* 시각 t의 화면. 장 j는 j·step에 등장하기 시작해 fade초 동안 앞 장 위로 서서히 올라온다.
+   * (이전 버전은 전환 시작 순간 이미 다음 장으로 넘어가 버려서 섞이는 구간이 아예 없었다) */
+  function paint(t) {
+    let j = step > 0 ? Math.floor(t / step) : 0;
+    if (j > n - 1) j = n - 1;
+    if (fade > 0 && j >= 1 && t < j * step + fade) {
+      ctx.globalAlpha = 1; ctx.drawImage(frame(j - 1), 0, 0);
+      ctx.globalAlpha = ease((t - j * step) / fade); ctx.drawImage(frame(j), 0, 0);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.drawImage(frame(j), 0, 0);
+    }
+  }
 
   const stream = canvas.captureStream(fps);
   const bitrate = Math.round(W * H * fps * 0.11);   // 1080p30 ≈ 6.8Mbps
@@ -163,9 +208,7 @@ async function build() {
   rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
   const stopped = new Promise((res) => { rec.onstop = res; });
 
-  // 첫 장을 미리 그려 두고 시작 (검은 프레임 방지)
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-  drawFit(ctx, slides[0].img, W, H, 1);
+  paint(0);   // 첫 장을 미리 그려 두고 시작 (검은 프레임 방지)
 
   rec.start(1000);
   const t0 = performance.now();
@@ -175,14 +218,7 @@ async function build() {
       const t = (now - t0) / 1000;
       if (t >= total) { done(); return; }
 
-      let i = step > 0 ? Math.floor(t / step) : 0;
-      if (i > n - 1) i = n - 1;
-      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-      drawFit(ctx, slides[i].img, W, H, 1);
-      if (fade > 0 && i < n - 1) {
-        const a = (t - (i + 1) * step) / fade;      // 다음 장이 겹쳐 올라오는 구간
-        if (a > 0) drawFit(ctx, slides[i + 1].img, W, H, Math.min(a, 1));
-      }
+      paint(t);
 
       const p = Math.min(t / total, 1);
       $('barFill').style.width = (p * 100).toFixed(1) + '%';
@@ -197,8 +233,7 @@ async function build() {
   await new Promise((done) => {
     const tEnd = performance.now() + 400;
     (function hold(now) {
-      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-      drawFit(ctx, slides[n - 1].img, W, H, 1);
+      ctx.drawImage(frame(n - 1), 0, 0);
       if (now < tEnd) requestAnimationFrame(hold); else done();
     })(performance.now());
   });
@@ -233,6 +268,7 @@ const drop = $('drop');
   drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
 drop.addEventListener('drop', (e) => { if (e.dataTransfer?.files) addFiles(e.dataTransfer.files); });
 
+$('sec').addEventListener('input', syncFadeMax);
 ['sec', 'fade', 'size'].forEach((id) => $(id).addEventListener('input', updateSpec));
 $('go').addEventListener('click', build);
 $('again').addEventListener('click', () => {
@@ -245,6 +281,10 @@ $('again').addEventListener('click', () => {
   if (!MIME) {
     el.innerHTML = '이 브라우저는 영상 녹화(MediaRecorder)를 지원하지 않습니다. <b>Chrome</b>이나 <b>Edge</b> 최신 버전으로 열어 주세요.';
     el.hidden = false;
+  } else if (MIME === 'video/mp4') {
+    el.innerHTML = '이 브라우저는 MP4 안의 영상 방식을 H.264로 정하지 못합니다. TV에서 재생되지 않으면 '
+      + '<b>Chrome 최신 버전</b>으로 다시 만들어 주세요.';
+    el.hidden = false;
   } else if (EXT === 'webm') {
     el.innerHTML = '이 브라우저에서는 <b>WEBM</b>으로 저장됩니다. TV·USB 플레이어는 보통 MP4만 읽으므로, '
       + 'MP4가 필요하면 <b>Chrome 최신 버전</b>으로 열어 주세요.';
@@ -252,4 +292,5 @@ $('again').addEventListener('click', () => {
   }
 })();
 
+syncFadeMax();
 updateSpec();
