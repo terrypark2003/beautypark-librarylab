@@ -58,6 +58,9 @@ code{background:var(--ivory);padding:1px 5px;border-radius:4px;font-size:12px}
   font-size:13px;color:var(--deep)}
 .warn{margin:0 0 12px;padding:11px 13px;border-radius:9px;font-size:13px;
   background:#FBF3E4;border:1px solid #E8D9BA;color:#6B5426}
+.err{margin:0 0 12px;padding:11px 13px;border-radius:9px;font-size:13px;line-height:1.6;
+  background:#FBECEA;border:1px solid #E9C3BD;color:#7A2E24}
+.err code{display:inline-block;margin-top:4px;background:#fff;color:#7A2E24}
 .prog{margin-top:16px}
 .bar{height:9px;background:var(--line);border-radius:99px;overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--toffee);
